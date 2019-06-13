@@ -13,7 +13,7 @@ import threading                # Used for creating thread and sync events
 import time
 import h5py
 import numpy as np
-from ts_data import TimeSeries
+from pyratk.datatypes.ts_data import TimeSeries
 
 
 class VirtualDAQ(daq_mgr.DAQ):

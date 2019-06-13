@@ -8,8 +8,8 @@ Author: Jason Merlo
 Maintainer: Jason Merlo (merlojas@msu.edu)
 """
 import h5py                     # Used for hdf5 database
-from mux_buffer import MuxBuffer
-from virtual_daq import VirtualDAQ
+from pyratk.acquisition.mux_buffer import MuxBuffer
+from pyratk.acquisition.virtual_daq import VirtualDAQ
 
 # COMPRESSION OPTIONS
 COMPRESSION = "gzip"

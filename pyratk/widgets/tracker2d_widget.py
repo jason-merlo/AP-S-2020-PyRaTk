@@ -10,7 +10,7 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 import pyqtgraph as pg          # Used for RadarWidget superclass
 import numpy as np              # Used for numerical operations
 import platform                 # Get OS for DPI scaling
-from geometry import Circle
+from pyratk.datatypes.geometry import Circle
 
 
 class Tracker2dWidget(pg.GraphicsLayoutWidget):
