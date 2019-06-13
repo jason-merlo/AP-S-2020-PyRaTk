@@ -8,11 +8,10 @@ DAQ emulation class to playback recorded DAQ datasets in a transparent manner.
 
 last_modified: 8/22/2018
 """
-import daq_mgr                  # Extention of DAQ object
-import threading                # Used for creating thread and sync events
+from pyratk.acquisition import daq_mgr   # Extention of DAQ object
+import threading                     # Used for creating thread and sync events
 import time
 import h5py
-import numpy as np
 from pyratk.datatypes.ts_data import TimeSeries
 
 
