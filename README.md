@@ -3,4 +3,4 @@ To install simply clone this project into the desired location, move into the ne
 
 To use PyRaTK simply call: `import pyratk` 
 
-Or import a specific package" `from pyratk.datatypes import geometry`
+Or to import a specific package: `from pyratk.datatypes import geometry`
