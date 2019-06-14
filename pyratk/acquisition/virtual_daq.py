@@ -2,20 +2,20 @@
 """
 Virtual DAQ Class.
 
-Author: Jason Merlo
 Description:
 DAQ emulation class to playback recorded DAQ datasets in a transparent manner.
 
-last_modified: 8/22/2018
+Author: Jason Merlo
+Maintainer: Jason Merlo (merlojas@msu.edu)
 """
-from pyratk.acquisition import daq_mgr   # Extention of DAQ object
+from pyratk.acquisition import daq   # Extention of DAQ object
 import threading                     # Used for creating thread and sync events
 import time
 import h5py
 from pyratk.datatypes.ts_data import TimeSeries
 
 
-class VirtualDAQ(daq_mgr.DAQ):
+class VirtualDAQ(daq.DAQ):
     """Emulate DAQ using HDF5 dataset data."""
 
     def __init__(self):

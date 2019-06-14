@@ -37,8 +37,6 @@ class Tracker2D(object):
         start_loc (default=Point(0.0, 0.0, 0.26035))
             Point indicating the initial location of the object to track
         """
-        super(Tracker2D, self).__init__()
-
         self.valid_constraints = {1: ['x', 'y', 'z'],
                                   2: ['xy', 'xz', 'yz'],
                                   3: []}
