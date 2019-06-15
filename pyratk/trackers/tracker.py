@@ -7,7 +7,7 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 """
 import numpy as np                            # Storing data
 from pyratk.datatypes.ts_data import TimeSeries                # storing data
-from pyratk.datatypes.geometry import Point, Circle, Triangle  # storing geometric information
+from pyratk.datatypes.geometry import Point, Circle, Triangle
 import itertools                              # 'triangulating' radar radii
 import math
 import sys
