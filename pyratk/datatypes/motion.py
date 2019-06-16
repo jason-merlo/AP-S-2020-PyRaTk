@@ -114,15 +114,15 @@ class StateMatrix(object):
 
         # Perform coordinate type checking
         if self.coordinate_type == 'cartesian':
-            if name not in coordinate_types['cartesian']:
+            if name not in self.coordinate_types['cartesian']:
                 raise AttributeError("Cartesian coordinate has no attribute",
                                      name)
         elif self.coordinate_type == 'cylindrical':
-            if name not in coordinate_types['cylindrical']:
+            if name not in self.coordinate_types['cylindrical']:
                 raise AttributeError("Cylindrical coordinate has no attribute",
                                      name)
         elif self.coordinate_type == 'spherical':
-            if name not in coordinate_types['spherical']:
+            if name not in self.coordinate_types['spherical']:
                 raise AttributeError("Spherical coordinate has no attribute",
                                      name)
 
@@ -131,15 +131,6 @@ class StateMatrix(object):
 
     def __repr__(self):
         """Print StateVector to output stream."""
-        # if self.coordinate_type == 'cartesian':
-        #     ret_str = '\tx: {:}\n\ty: {:}\n\tz: {:}'.format(
-        #         self.x, self.y, self.z)
-        # elif self.coordinate_type == 'cylindrical':
-        #     ret_str = 'r: {:}\ntheta: {:}\nz: {:}'.format(
-        #         self.r, self.theta, self.z)
-        # elif self.coordinate_type == 'spherical':
-        #     ret_str = 'rho: {:}\ntheta: {:}\nphi: {:}'.format(
-        #         self.rho, self.theta, self.z)
         if self.coordinate_type == 'cartesian':
             coord_list = self.coordinate_types['cartesian']
         elif self.coordinate_type == 'cylindrical':
