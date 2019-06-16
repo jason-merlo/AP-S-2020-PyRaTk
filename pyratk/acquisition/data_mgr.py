@@ -137,9 +137,10 @@ class DataManager(MuxBuffer):
             # Does not exist, create new entry
             try:
                 # Save buffer data
-                ds = self.samples.create_dataset(name, data=self.source.ts_buffer,
-                                                 compression=COMPRESSION,
-                                                 compression_opts=COMPRESSION_OPTS)
+                ds = self.samples.create_dataset(
+                    name, data=self.source.ts_buffer,
+                    compression=COMPRESSION,
+                    compression_opts=COMPRESSION_OPTS)
             except Exception as e:
                 print("(DataManager) Error saving dataset: ", e)
 
@@ -149,16 +150,27 @@ class DataManager(MuxBuffer):
         else:
             labels_str = []  # used for saving labels to attribute
             for label in labels:
-                print('Checking if',
-                      "{:}/{:}".format(label.name, name), 'exists')
-                if "{:}/{:}".format(label.name, name) not in self.db:
-                    self.labels[label.name][name] = ds
-                labels_str.append(label.name.split('/')[-1])
+                # Get type of label
+                if type(label) is str:
+                    label_name = label
+                else:
+                    label_name = label.name
+                # print('Checking if',
+                #       "labels/{:}/{:}".format(label_name, name), 'exists')
+                if "{:}/{:}".format(label_name, name) not in self.labels:
+                    self.labels.create_group(label_name)
+                    self.labels[label_name][name] = ds
+                labels_str.append(label_name.split('/')[-1])
             labels_str = ','.join(labels_str)
 
         if subject:
-            if "{:}/{:}".format(subject.name, name) not in self.db:
-                self.subjects[subject.name][name] = ds
+            if type(subject) is str:
+                subject_name = subject
+            else:
+                subject_name = subject.name
+            if "{:}/{:}".format(subject_name, name) not in self.subjects:
+                self.subjects.create_group(subject_name)
+                self.subjects[subject_name][name] = ds
 
         if notes is None:
             notes = ''
@@ -172,8 +184,12 @@ class DataManager(MuxBuffer):
             attrs.create("num_channels", self.source.num_channels)
             attrs.create("label", labels_str.encode('utf8'))
             if subject:
+                if type(subject) is str:
+                    subject_name = subject
+                else:
+                    subject_name = subject.name
                 attrs.create("subject",
-                             subject.name.split('/')[-1].encode('utf8'))
+                             subject_name.split('/')[-1].encode('utf8'))
             attrs.create("notes", notes.encode('utf8'))
         except Exception as e:
             print("(DataManager) Error saving attributes: ", e)
