@@ -217,3 +217,18 @@ class StateMatrix(object):
         else:
             raise TypeError("Argument must be ndarray of shape (3,) or"
                             " StateVector")
+
+    @property
+    def p(self):
+        """Return position vector."""
+        return self.q[:, 0]
+
+    @property
+    def v(self):
+        """Return velocity vector."""
+        return self.q[:, 1]
+
+    @property
+    def a(self):
+        """Return acceleration vector."""
+        return self.q[:, 2]
