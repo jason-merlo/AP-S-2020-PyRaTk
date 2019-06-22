@@ -28,6 +28,12 @@ class StateVector(object):
     def __getitem__(self, val):
         return self.q[val]
 
+    def __setitem__(self, idx, val):
+        self.q[idx] = val
+
+    def __len__(self):
+        return len(self.q)
+
     @property
     def p(self):
         """Getter for positional element of state vector."""
@@ -128,6 +134,18 @@ class StateMatrix(object):
 
         name = self.aliases.get(name, name)
         return object.__getattribute__(self, name)
+
+    def __len__(self):
+        """Return outer dimension of matrix"""
+        return self.q.shape[0]
+
+    def __getitem__(self, idx):
+        """Return outer dimension of matrix"""
+        return StateVector(self.q[idx])
+
+    def __copy__(self):
+        """Return copy of self."""
+        return StateMatrix(self.q)
 
     def __repr__(self):
         """Print StateVector to output stream."""
