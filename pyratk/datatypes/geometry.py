@@ -34,8 +34,6 @@ class Point(object):
                 except TypeError:
                     raise TypeError('Point expects tuple, or two numbers, '
                                     'or three numbers; got', type(args[0]))
-            # except all as e:
-            #    raise(e)
         # if argument is 2D
         elif alen == 2:
             self.x = args[0]
@@ -48,10 +46,39 @@ class Point(object):
         elif alen != 0:
             raise TypeError('Point expects at most three arguments, got', alen)
 
+    @property
+    def r(self):
+        """Return `R` in spherical coordinates."""
+        return self.length
+
+    @property
+    def phi(self):
+        """
+        Return `phi` in spherical coordinates in radians.
+
+        `phi` is defined as the angle between the x-axis and the line which
+        extends through the point projected onto the xy-plane.
+        """
+        return np.arctan2(self.y, self.x)
+
+    @property
+    def theta(self):
+        """
+        Return `theta` in spherical coordinates in radians.
+
+        `theta` is defined as the angle between the z-axis and the line which
+        extends through the point.
+        """
+        xy_dist = np.sqrt(self.x**2, self.y**2)
+        return np.arctan2(xy_dist, self.z)
+
+    @property
+    def sph(self):
+        """Return a Point representing spherical coordinates."""
+        return Point(self.r, self.phi, self.theta)
+
     def distance(self, a=None):
-        '''
-        Find distance between self and another Point
-        '''
+        """Find distance between self and another Point."""
         # If no arguments provided, compare to origin
         if a is None:
             a = Point(0, 0)
@@ -60,9 +87,29 @@ class Point(object):
         dz = self.z - a.z
         return np.sqrt(dx**2 + dy**2 + dz**2)
 
+    # def angle(self, a=None):
+    #     """Find angle between self and another point in radians.
+    #
+    #     The angle computed is relative to the point provided (where the point
+    #     provided is 0 radians).  If not point is provided, the origin is used
+    #     as a reference.
+    #
+    #     Args:
+    #         a (Point): Reference Point used to compute angle to.
+    #
+    #     Returns:
+    #         numpy.ndarray(3,): Angle between two points (r, phi, theta) in
+    #             radians.
+    #
+    #     """
+    #     if a is None:
+    #         a = Point(0, 0)
+    #     r =
+    #     return np.arctan2()
+
     def normalize(self):
         '''
-        will convert Point into a vector of length 1
+        Convert Point into a vector of length 1
         '''
         len = self.length
         if len != 0:
