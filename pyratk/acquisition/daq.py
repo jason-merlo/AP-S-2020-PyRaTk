@@ -24,7 +24,7 @@ from pyratk.datatypes.ts_data import TimeSeries
 
 class DAQ(object):
     def __init__(self, daq_type="NI-DAQ",
-                 sample_rate=44100, sample_size=4096,
+                 sample_rate=44100, sample_chunk_size=4096,
                  # NI-DAQ specific
                  dev_string="Dev1/ai0:7",
                  sample_mode=nidaqmx.constants.AcquisitionType.FINITE):
@@ -35,12 +35,12 @@ class DAQ(object):
         dev_string -- device and ports to initialize (default: "Dev1/ai0:7")
         sample_rate -- frequency in Hz to sample at (default: 44100)
         sample_mode -- finite or continuous acquisition (default: finite)
-        sample_size -- size of chunk to read (default/max: 4095)
+        sample_chunk_size -- size of chunk to read (default/max: 4095)
         """
         # Copy member data
         # General arguments
         self.sample_rate = sample_rate
-        self.sample_size = sample_size
+        self.sample_chunk_size = sample_chunk_size
         self.daq_type = daq_type
         self.paused = False  # Start running by default
         self.reset_flag = False
@@ -70,7 +70,7 @@ class DAQ(object):
 
                 self.task.timing.cfg_samp_clk_timing(
                     sample_rate, sample_mode=sample_mode,
-                    samps_per_chan=sample_size)
+                    samps_per_chan=sample_chunk_size)
                 self.in_stream = \
                     stream_readers.AnalogMultiChannelReader(
                         self.task.in_stream)
@@ -96,7 +96,7 @@ class DAQ(object):
             pass  # TODO insert pyaudio support here
 
         # Create data member to store samples
-        self.data = np.empty((self.num_channels, self.sample_size),)
+        self.data = np.empty((self.num_channels, self.sample_chunk_size),)
 
         # Spawn sampling thread
         self.run()
@@ -104,7 +104,7 @@ class DAQ(object):
         # Create data buffers
         self.buffer = []
         length = 4096
-        shape = (self.num_channels, self.sample_size)
+        shape = (self.num_channels, self.sample_chunk_size)
         self.ts_buffer = TimeSeries(length, shape)
 
     # === SAMPLING ======================================================
@@ -120,9 +120,9 @@ class DAQ(object):
     def get_samples(self):
         """Read device sample buffers returning the specified sample size."""
         if self.daq_type == "FakeDAQ":
-            sleep_time = self.sample_size / self.sample_rate
+            sleep_time = self.sample_chunk_size / self.sample_rate
             self.data = np.random.randn(
-                self.num_channels, self.sample_size) * 0.001 + \
+                self.num_channels, self.sample_chunk_size) * 0.001 + \
                 np.random.randn(1) * 0.001 + 0.01
             time.sleep(sleep_time)
         else:

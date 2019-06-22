@@ -44,8 +44,8 @@ class MuxBuffer(object):
         return self.source.sample_rate
 
     @property
-    def sample_size(self):
-        return self.source.sample_size
+    def sample_chunk_size(self):
+        return self.source.sample_chunk_size
 
     @property
     def daq_type(self):

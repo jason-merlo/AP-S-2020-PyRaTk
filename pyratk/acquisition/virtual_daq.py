@@ -22,7 +22,7 @@ class VirtualDAQ(daq.DAQ):
         """Create virtual DAQ object to play back recording (hdf5 dataset)."""
         # Attributes
         self.sample_rate = None
-        self.sample_size = None
+        self.sample_chunk_size = None
         self.daq_type = None
         self.num_channels = None
 
@@ -63,14 +63,14 @@ class VirtualDAQ(daq.DAQ):
 
         # Load attributes
         self.sample_rate = ds.attrs["sample_rate"]
-        self.sample_size = ds.attrs["sample_size"]
+        self.sample_chunk_size = ds.attrs["sample_size"]
         self.daq_type = ds.attrs["daq_type"].decode('utf-8')
         self.num_channels = ds.attrs["num_channels"]
-        self.sample_period = self.sample_size / self.sample_rate
+        self.sample_period = self.sample_chunk_size / self.sample_rate
 
         # Create data buffers
         length = 4096
-        shape = (self.num_channels, self.sample_size)
+        shape = (self.num_channels, self.sample_chunk_size)
         self.ts_buffer = TimeSeries(length, shape)
 
     def get_samples(self, dir=1, loop=True, speed=1):

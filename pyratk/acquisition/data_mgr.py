@@ -158,7 +158,6 @@ class DataManager(MuxBuffer):
                 # print('Checking if',
                 #       "labels/{:}/{:}".format(label_name, name), 'exists')
                 if "{:}/{:}".format(label_name, name) not in self.labels:
-                    self.labels.create_group(label_name)
                     self.labels[label_name][name] = ds
                 labels_str.append(label_name.split('/')[-1])
             labels_str = ','.join(labels_str)
@@ -169,7 +168,6 @@ class DataManager(MuxBuffer):
             else:
                 subject_name = subject.name
             if "{:}/{:}".format(subject_name, name) not in self.subjects:
-                self.subjects.create_group(subject_name)
                 self.subjects[subject_name][name] = ds
 
         if notes is None:
@@ -179,7 +177,7 @@ class DataManager(MuxBuffer):
             # Save attribute data
             attrs = self.samples[name].attrs
             attrs.create("sample_rate", self.source.sample_rate)
-            attrs.create("sample_size", self.source.sample_size)
+            attrs.create("sample_size", self.source.sample_chunk_size)
             attrs.create("daq_type", self.source.daq_type.encode('utf8'))
             attrs.create("num_channels", self.source.num_channels)
             attrs.create("label", labels_str.encode('utf8'))

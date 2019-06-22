@@ -68,7 +68,7 @@ class Radar(object):
         self.fft_size = fft_size
 
         # Derived processing parameters
-        self.update_rate = self.data_mgr.sample_rate / self.data_mgr.sample_size
+        self.update_rate = self.data_mgr.sample_rate / self.data_mgr.sample_chunk_size
         self.bin_size = self.data_mgr.sample_rate / self.fft_size
         self.center_bin = np.ceil(self.fft_size / 2)
 
@@ -81,7 +81,7 @@ class Radar(object):
         # === State variables ===
         # initial array size 4096 samples
         length = 4096
-        data_shape = (2, self.data_mgr.source.sample_size)
+        data_shape = (2, self.data_mgr.source.sample_chunk_size)
 
         # initialize data arrays
         # NOTE: cfft_data initialize to ones for log graph – log(0) is undef.
@@ -141,9 +141,9 @@ class Radar(object):
         # Get window of FFT data
         # TODO: why didn't the below line work?
         # window_slice = \
-        #     self.data_mgr.ts_buffer[slice:slice + 2][-self.window_size // self.data_mgr.sample_size:]
+        #     self.data_mgr.ts_buffer[slice:slice + 2][-self.window_size // self.data_mgr.sample_chunk_size:]
         window_slice = \
-                self.ts_data[-self.window_size // self.data_mgr.sample_size:]
+                self.ts_data[-self.window_size // self.data_mgr.sample_chunk_size:]
         slice_shape = window_slice.shape
         start_idx = (slice_shape[0] * slice_shape[2]) - self.window_size
         # Check if time-series is still smaller than window size
@@ -160,7 +160,7 @@ class Radar(object):
         q_data = list(itertools.chain(*q_data))
         iq_data = np.array([i_data, q_data])
 
-        # Calculate complex FFT (may be zero-padded if fft-size > sample_size)
+        # Calculate complex FFT (may be zero-padded if fft-size > sample_chunk_size)
         self.cfft_data = self.compute_cfft(iq_data, self.fft_size)
 
         # Power Thresholding
