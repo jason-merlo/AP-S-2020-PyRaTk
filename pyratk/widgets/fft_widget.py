@@ -36,7 +36,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
             self.vmax_plot.setLimits(
                 xMax=0, yMax=20, yMin=-20)
             self.vmax_pw = self.vmax_plot.plot()
-            self.a_pw = self.vmax_plot.plot()
+            # self.a_pw = self.vmax_plot.plot()
             self.vmax_plot.setLabel('left', text="Radial Velocity", units="m/s")
             self.vmax_ax_bottom = self.vmax_plot.getAxis('bottom')
             self.vmax_ax_bottom.setScale(self.update_period)
@@ -59,7 +59,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.fft_plot.setRange(disableAutoRange=True,
                                xRange=fft_xrange, yRange=fft_yrange)
         self.fft_plot.setLimits(
-            xMin=fft_xrange[0], xMax=fft_xrange[1], yMin=-80, yMax=70)
+            xMin=fft_xrange[0], xMax=fft_xrange[1], yMin=-80, yMax=100)
         self.fft_pw = self.fft_plot.plot()
         self.fft_max_freq_line = pg.InfiniteLine(angle=90, movable=False)
         self.fft_max_pwr_line = pg.InfiniteLine(angle=0, movable=False)
@@ -76,9 +76,9 @@ class FftWidget(pg.GraphicsLayoutWidget):
 
     def update_vmax(self):
         # Update fmax graph
-        vmax_data = self.radar.ts_drho.data  # self.radar.ts_v.data
-        vmax_ptr = self.radar.ts_v.head_ptr
-        self.vmax_pw.setData(vmax_data, pen=pg.mkPen({'color': "FF0"}))
+        vmax_data = self.radar.ts_drho.data
+        vmax_ptr = self.radar.ts_drho.head_ptr
+        self.vmax_pw.setData(vmax_data, pen=pg.mkPen({'color': "FFF"}))
         self.vmax_pw.setPos(-vmax_ptr, 0)
 
         # a_data = self.radar.ts_a.data
@@ -94,8 +94,6 @@ class FftWidget(pg.GraphicsLayoutWidget):
 
     def update_fft(self):
         if self.radar.cfft_data is not None:
-            print("(fft_widget, update_fft)")
-            print(self.radar.cfft_data)
             log_fft = 10 * np.log(self.radar.cfft_data)
             max_log_fft = max(log_fft)
             self.fft_pw.setData(log_fft)

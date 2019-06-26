@@ -116,7 +116,7 @@ class Radar(object):
     def compute_cfft(self, data, fft_size):
         """Compute fft and fft magnitude for plotting."""
         # Create complex data from input
-        complex_data = data[0] + data[1] * 1j
+        complex_data = data[0] + data[1] * 1.0j
         # Create hanning window
         hanning = np.hanning(complex_data.shape[0])
         fft_complex = np.fft.fft(complex_data * hanning, fft_size)
@@ -133,10 +133,10 @@ class Radar(object):
 
     def update(self, data):
         # Get data from data_mgr
-        slice = 2 * self.index
+        channel_slice = 2 * self.index
 
         # TODO remove ts_data, use data_mgr.ts_buffer instead
-        self.ts_data.append(data[slice:slice + 2])
+        self.ts_data.append(data[channel_slice:channel_slice + 2])
 
         # Get window of FFT data
         # TODO: why didn't the below line work?
@@ -145,10 +145,10 @@ class Radar(object):
         window_slice = \
                 self.ts_data[-self.window_size // self.data_mgr.sample_chunk_size:]
         slice_shape = window_slice.shape
-        start_idx = (slice_shape[0] * slice_shape[2]) - self.window_size
-        # Check if time-series is still smaller than window size
-        if start_idx < 0:
-            start_idx = 0
+        # start_idx = (slice_shape[0] * slice_shape[2]) - self.window_size
+        # # Check if time-series is still smaller than window size
+        # if start_idx < 0:
+        #     start_idx = 0
 
         i_data = []
         q_data = []
@@ -163,12 +163,14 @@ class Radar(object):
         # Calculate complex FFT (may be zero-padded if fft-size > sample_chunk_size)
         self.cfft_data = self.compute_cfft(iq_data, self.fft_size)
 
-        # Power Thresholding
         vmax_bin = np.argmax(self.cfft_data).astype(np.int32)
-        if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
-            self.fmax = 0
-        else:
-            self.fmax = self.bin_to_freq(vmax_bin)
+        # Power Thresholding
+        # if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
+        #     self.fmax = 0
+        # else:
+        #     self.fmax = self.bin_to_freq(vmax_bin)
+        self.fmax = self.bin_to_freq(vmax_bin)
+
 
         # Add current measurement to time series
         self.ts_drho.append(self.vmax)
@@ -177,15 +179,15 @@ class Radar(object):
 
     def reset(self):
         pass
-        # self.ts_data.clear()
-        # self.ts_drho.clear()
+        self.ts_data.clear()
+        self.ts_drho.clear()
         # self.ts_v.clear()
         # self.ts_r.clear()
         # self.ts_a.clear()
 
     @property
     def vmax(self):
-        return -self.freq_to_vel(self.fmax)
+        return self.freq_to_vel(self.fmax)
 
 
 class RadarArray(list):

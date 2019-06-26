@@ -47,9 +47,17 @@ class Point(object):
             raise TypeError('Point expects at most three arguments, got', alen)
 
     @property
-    def r(self):
-        """Return `R` in spherical coordinates."""
-        return self.length
+    def r(self, a):
+        """Return `R` in spherical coordinates relative to `a`.
+
+        Args:
+            a (Point): Point to compute radius relative to.
+
+        Returns:
+            float: Distance from Point `a`.
+
+        """
+        return self.distance(a)
 
     @property
     def phi(self):
