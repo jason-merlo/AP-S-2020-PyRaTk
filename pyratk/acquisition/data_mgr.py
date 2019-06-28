@@ -49,6 +49,8 @@ class DataManager(MuxBuffer):
             self.open_database(db)
         except Exception as e:
             print("(DataManager) Error opening debug database:", e)
+            raise RuntimeError("Cannot open specified dataset - is it already"
+                               " opened elsewhere?")
 
     # === DATABASE ============================================================
 

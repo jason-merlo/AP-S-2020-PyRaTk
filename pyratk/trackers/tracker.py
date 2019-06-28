@@ -11,6 +11,8 @@ from pyratk.datatypes.geometry import Point, Circle, Triangle
 import itertools                              # 'triangulating' radar radii
 import math
 import sys
+import time
+import logging
 
 # DEBUG
 USE_LPF = True
@@ -142,7 +144,8 @@ class Tracker2D(object):
         if not buffer:
             print("(DEBUG, tracker.py) Nothing in buffer.")
         else:
-            print("(DEBUG, tracker.py) Updating tracker...")
+            print("(DEBUG, tracker.py) Updating tracker... Buffer size: ",
+                  len(buffer))
 
         while buffer:
             # Remove oldest data in queue
@@ -229,6 +232,10 @@ class Tracker2D(object):
         self.array.reset()
         self.loc = self.start_loc.copy()
 
-
+    def update_loop(self, update_rate):
+        """Loop for updating tracker from thread."""
+        while True:
+            self.update()
+            time.sleep(1.0 / update_rate)
 # class TrackerEvaluator(Object):
 #     def __init__():
