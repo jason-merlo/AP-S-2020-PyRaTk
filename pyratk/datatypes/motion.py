@@ -79,12 +79,12 @@ class StateMatrix(object):
         """
         if coordinate_type == self.coordinate_type and origin == Point():
             # If no change is needed, return self state matrix
-            return_matrix = self.q
+            return_matrix = self.q.copy()
 
         elif coordinate_type == 'cartesian':
             # First convert to cartesian
             if self.coordinate_type == 'cartesian':
-                return_matrix = self.q
+                return_matrix = self.q.copy()
             elif self.coordinate_type == 'cylindrical':
                 return_matrix = np.empty(self.q.shape)
 
@@ -184,7 +184,7 @@ class StateMatrix(object):
                                "convert to."
                                .format(coordinate_type))
 
-        return StateMatrix(return_matrix)
+        return StateMatrix(return_matrix, coordinate_type=coordinate_type)
 
     # @property
     # def v(self, coord='cartesian'):
