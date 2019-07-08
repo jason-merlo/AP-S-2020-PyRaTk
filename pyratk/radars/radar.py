@@ -14,10 +14,12 @@ import numpy as np              # Storing data
 from pyratk.datatypes.ts_data import TimeSeries  # storing data
 import scipy.constants as spc   # speed of light
 from pyratk.datatypes.geometry import Point      # radar location
-import itertools                # flatten radar array for indexing
-from collections import deque   # Used for keeping previous states
-from reikna import fft          # Used for hardware acceleration of FFT
+# import itertools                # flatten radar array for indexing
+# from collections import deque   # Used for keeping previous states
+# from reikna import fft          # Used for hardware acceleration of FFT
 import time
+# import logging
+# import threading
 
 
 # CONSTANTS
@@ -57,7 +59,6 @@ class Radar(object):
             loc
                 Point() indicating the location of the radar
         """
-        print('Initializing Radar', data_idx)
         # Data stream parameters
         # TODO: create DataStream object representing I or I/Q data
         self.data_mgr = data_mgr
@@ -69,28 +70,24 @@ class Radar(object):
 
         # Processing parameters
         self.fft_size = fft_size
+        self.window_size = fft_win_size
 
         # Derived processing parameters
         self.update_rate = self.data_mgr.sample_rate / self.data_mgr.sample_chunk_size
-        self.bin_size = self.data_mgr.sample_rate / self.fft_size
         self.center_bin = np.ceil(self.fft_size / 2)
-
-        # Set fft windowing size for zero-padding (default is 4x fft_size)
-        if fft_win_size is None:
-            self.window_size = 4 * fft_size
-        else:
-            self.window_size = fft_win_size
+        self.bin_size = self.data_mgr.sample_rate / self.fft_size
 
         # === State variables ===
         # initial array size 4096 samples
         length = 4096
-        data_shape = (2, self.data_mgr.source.sample_chunk_size)
+        chunk_size = self.data_mgr.source.sample_chunk_size
+        data_shape = (2, chunk_size)
 
         # initialize data arrays
         # NOTE: cfft_data initialize to ones for log graph – log(0) is undef.
         self.ts_data = TimeSeries(length, data_shape, dtype=np.complex64)
-        self.cfft_data = np.ones(self.window_size, dtype=np.float64)
-        self.fft_window = np.empty((self.window_size, 2), dtype=np.float64)
+        self.data_buffer = TimeSeries(length, (1,), dtype=np.complex64)
+        self.cfft_data = np.ones(self.fft_size, dtype=np.float64)
 
         # Instantaneous state variables
         self.fmax = 0
@@ -106,111 +103,86 @@ class Radar(object):
 
         # Initialize hardare accelration
         self.cluda_thread = cluda_thread
-        if self.cluda_thread is not None:
-            print('Configuring FFT...')
-            reikna_fft = fft.FFT(np.empty(fft_size, dtype=np.complex64))
-            print('Compiling FFT...')
-            self.compiled_fft = reikna_fft.compile(cluda_thread)
-            print('Configuring FFT Completed.')
+        # if self.cluda_thread is not None:
+        #     print('Configuring FFT...')
+        #     reikna_fft = fft.FFT(np.empty(fft_size, dtype=np.complex64))
+        #     print('Compiling FFT...')
+        #     self.compiled_fft = reikna_fft.compile(cluda_thread)
+        #     print('Configuring FFT Completed.')
 
     def freq_to_vel(self, freq):
         """Compute the velocity for a given frequency and the radar f0."""
         c = spc.speed_of_light
-
-        vel = (c * self.f0 / (freq + self.f0)) - c
-
-        return vel
+        velocity = (c * self.f0 / (freq + self.f0)) - c
+        return velocity
 
     def bin_to_freq(self, bin):
         """Compute frequency based on bin location."""
-        return (bin - self.center_bin) * self.bin_size
+        return (bin - self.center_bin) * float(self.bin_size)
 
-    def compute_cfft(self, data, fft_size):
+    def compute_cfft(self, complex_data, fft_size):
         """Compute fft and fft magnitude for plotting."""
-        # Create complex data from input
-        complex_data = data[0] + data[1] * 1.0j
         # Create hanning window
-        hanning = np.hanning(complex_data.shape[0])
-        fft_array = np.zeros((fft_size,), dtype=complex)
-        fft_array[:complex_data.shape[0]] = complex_data * hanning
+        # hanning = np.hanning(complex_data.shape[0])
+
+        # Create zero-padded array to be transformed
+        fft_array = np.zeros((fft_size,), dtype=np.complex64)
+        fft_array[:complex_data.size] = complex_data  # * hanning
+
+        # Compute FFT using desired compute method
         if self.cluda_thread is None or True:
-            fft_complex = np.fft.fft(fft_array)
-        else:
+            # Normalize FFT magnitude to window size
+            fft_complex = np.fft.fft(fft_array, norm='ortho')
+        # else:
             # Currently not working
-            arr_dev = self.cluda_thread.to_device(fft_array)
-            res_dev = self.cluda_thread.array(fft_array.shape, fft_array.dtype)
-            self.compiled_fft(res_dev, arr_dev)
-            fft_complex = res_dev.get()
+            # arr_dev = self.cluda_thread.to_device(fft_array)
+            # res_dev = self.cluda_thread.array(fft_array.shape, fft_array.dtype)
+            # self.compiled_fft(res_dev, arr_dev)
+            # fft_complex = res_dev.get()
+
+        # Adjust fft so DC is at the center
+        fft_complex = np.fft.fftshift(fft_complex)
+
         # Display only magnitude
         fft_mag = np.linalg.norm([fft_complex.real, fft_complex.imag], axis=0)
 
-        # Adjust fft so DC is at the center
-        center = int(fft_mag.shape[0] / 2)
-        fft_data = np.empty(fft_mag.shape)
-        fft_data[:center] = fft_mag[center:]
-        fft_data[center:] = fft_mag[:center]
-
-        return fft_data
+        return fft_mag
 
     def update(self, data):
         # Get data from data_mgr
         channel_slice = 2 * self.index
+        data_slice = data[channel_slice:channel_slice + 2]
+        iq_data_slice = data_slice[0, :] + data_slice[1, :] * 1.0j
 
         # TODO remove ts_data, use data_mgr.ts_buffer instead
-        self.ts_data.append(data[channel_slice:channel_slice + 2])
+        # self.ts_data.append(data_slice)
+        self.data_buffer = np.append(self.data_buffer, iq_data_slice)
 
         # Get window of FFT data
-        # TODO: why didn't the below line work?
-        # window_slice = \
-        #     self.data_mgr.ts_buffer[slice:slice + 2][-self.window_size // self.data_mgr.sample_chunk_size:]
-        window_slice = \
-                self.ts_data[-self.window_size // self.data_mgr.sample_chunk_size:]
-        slice_shape = window_slice.shape
-        # start_idx = (slice_shape[0] * slice_shape[2]) - self.window_size
-        # # Check if time-series is still smaller than window size
-        # if start_idx < 0:
-        #     start_idx = 0
-
-        i_data = []
-        q_data = []
-        for i in range(slice_shape[0]):
-            i_data.append(window_slice[i][0])
-            q_data.append(window_slice[i][1])
-
-        i_data = list(itertools.chain(*i_data))
-        q_data = list(itertools.chain(*q_data))
-        iq_data = np.array([i_data, q_data])
+        window_slice = self.data_buffer[-self.window_size:]
 
         # Calculate complex FFT (may be zero-padded if fft-size > sample_chunk_size)
-        # start_time = time.time()
-        self.cfft_data = self.compute_cfft(iq_data, self.fft_size)
-        # print('compute_cfft time: ', time.time() - start_time)
+        start_time = time.time()
+        self.cfft_data = self.compute_cfft(window_slice, self.fft_size)
+        print('compute_cfft time: ', time.time() - start_time)
 
-        vmax_bin = np.argmax(self.cfft_data).astype(np.int32)
+        # Find maximum frequency
+        fmax_bin = np.argmax(self.cfft_data)
+        self.fmax = self.bin_to_freq(fmax_bin)
         # Power Thresholding
         # if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
         #     self.fmax = 0
         # else:
         #     self.fmax = self.bin_to_freq(vmax_bin)
-        self.fmax = self.bin_to_freq(vmax_bin)
-
+        self.vmax = self.freq_to_vel(self.fmax)
 
         # Add current measurement to time series
         self.ts_drho.append(self.vmax)
         self.drho = self.vmax
 
-
     def reset(self):
-        pass
         self.ts_data.clear()
         self.ts_drho.clear()
-        # self.ts_v.clear()
-        # self.ts_r.clear()
-        # self.ts_a.clear()
-
-    @property
-    def vmax(self):
-        return self.freq_to_vel(self.fmax)
 
 
 class RadarArray(list):
@@ -245,5 +217,8 @@ class RadarArray(list):
 
     def update(self, data):
         """Update all radars in array."""
+        # start_time = time.time()
         for radar in self.radars:
             radar.update(data)
+        # print('(radar.py) radar_array.update() ran in {:} (s)'
+        #       .format(time.time() - start_time))
