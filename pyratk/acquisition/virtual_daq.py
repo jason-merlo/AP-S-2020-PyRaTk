@@ -73,7 +73,7 @@ class VirtualDAQ(daq.DAQ):
         shape = (self.num_channels, self.sample_chunk_size)
         self.ts_buffer = TimeSeries(length, shape)
 
-    def get_samples(self, dir=1, loop=True, speed=1):
+    def get_samples(self, stride=1, loop=-1, playback_speed=1.0):
         """Read sample from dataset at sampled speed, or one-by-one."""
         if (self.ds):
             print("(virtual_daq, get_samples) Getting new sample")
@@ -84,10 +84,12 @@ class VirtualDAQ(daq.DAQ):
                 print("Invalid sample index:", self.sample_index)
 
             # Delay by sample period
-            if loop:
-                time.sleep(self.sample_period * speed)
+            if loop == -1 or loop == 1:
+                time.sleep(self.sample_period * playback_speed)
+            elif loop == 0:
+                print('Stepped:', stride)
             else:
-                print('Stepped:', dir)
+                raise ValueError("Value must be -1, 0, or 1.")
 
             self.buffer.append((self.data, self.sample_index))
             self.ts_buffer.append(self.data)
@@ -95,7 +97,10 @@ class VirtualDAQ(daq.DAQ):
             self.data_available.set()
 
             # Incriment time index and loop around at end of dataset
-            self.sample_index = (self.sample_index + dir) % self.ds.shape[0]
+            self.sample_index = (self.sample_index + stride) % self.ds.shape[0]
+
+            # Return True if more data
+            return (self.sample_index + stride) % self.ds.shape[0] / stride < 1.0
         else:
             raise RuntimeError(
                 "(VirtualDAQ) Dataset source must be set to get samples")

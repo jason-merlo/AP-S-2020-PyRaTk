@@ -72,6 +72,8 @@ class DataManager(MuxBuffer):
             self.db = h5py.File(db_path, mode)
         except OSError as e:
             print("(DataManager) Error opening HDF5 File:", e)
+            raise RuntimeError("Cannot open or create specified dataset - is "
+                               "it already opened elsewhere?")
 
         # Attempt to open 'samples', 'labels', 'subjects' datasets
         # Create new datsets on keyerror
