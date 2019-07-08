@@ -147,17 +147,24 @@ class Tracker2D(object):
             print("(DEBUG, tracker.py) Updating tracker... Buffer size: ",
                   len(buffer))
 
-        while buffer:
+        tmp_loop_cnt = 0
+        # while buffer:
+        for cnt in range(4):
+            if not buffer:
+                break
+            tmp_loop_cnt += 1
             # Remove oldest data in queue
             data, sample_index = buffer.pop(0)
 
             # Check for a virtual DAQ loop around
+            # TODO: is there a better place for this?
             if sample_index == 0:
                 self.reset()
 
             # Compute new measurements at each radar based on new data
             self.array.update(data)
 
+            """
             # Check to see if this is the first iteration
             # Cannot update without two measurements
             if len(self.array.radars[0].ts_r) > 0:
@@ -225,6 +232,9 @@ class Tracker2D(object):
                 # print("=== RADAR {:} ===".format(i))
                 self.update_relative_positions(radar)  # Updates radar.r
                 self.propagate_track_radius(radar)
+        """
+
+        print('(tracker.py) update_loops: ', tmp_loop_cnt)
 
     def reset(self):
         """Reset all temporal elements."""
