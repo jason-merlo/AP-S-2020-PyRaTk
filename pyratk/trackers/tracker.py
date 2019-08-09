@@ -141,11 +141,11 @@ class Tracker2D(object):
         # Loop through all new data that has arrived in the buffer
         buffer = self.data_mgr.buffer
 
-        if not buffer:
-            print("(DEBUG, tracker.py) Nothing in buffer.")
-        else:
-            print("(DEBUG, tracker.py) Updating tracker... Buffer size: ",
-                  len(buffer))
+        # if not buffer:
+        #     print("(DEBUG, tracker.py) Nothing in buffer.")
+        # else:
+        #     print("(DEBUG, tracker.py) Updating tracker... Buffer size: ",
+        #           len(buffer))
 
         tmp_loop_cnt = 0
         # while buffer:
@@ -214,11 +214,10 @@ class Tracker2D(object):
                 # Set centroid of best triangle to new location
                 self.best_triangle = best_triangle
                 self.loc.x = best_triangle.centroid.x  # TODO check for bias
-                # self.loc.y = best_triangle.centroid.y
+                self.loc.y = best_triangle.centroid.y
 
                 if not math.isnan(self.loc.x):
-                    # print('Current location:', self.loc)
-                    pass
+                    print('Current location:', self.loc)
                 else:
                     print('Nan encountered, exiting...')
                     self.array.data_mgr.close()
@@ -232,7 +231,7 @@ class Tracker2D(object):
                 # print("=== RADAR {:} ===".format(i))
                 self.update_relative_positions(radar)  # Updates radar.r
                 self.propagate_track_radius(radar)
-        """
+            """
 
         print('(tracker.py) update_loops: ', tmp_loop_cnt)
 

@@ -5,26 +5,30 @@ Mux Buffer Class.
 Base mux type for data manager.
 
 Author: Jason Merlo
-last_modified: 8/21/2018
 """
 
+from pyqtgraph import QtCore
 
-class MuxBuffer(object):
+
+class MuxBuffer(QtCore.QObject):
     """
     MuxBuffer class - base class inherited by DataManager class.
 
     Handles multiple data input sources and aggrigates them into one data
     "mux" which can select from the various input sources added.
     """
+    data_available = QtCore.pyqtSignal()
 
     def __init__(self):
         """Initialize MuxBuffer Class."""
+        super().__init__()
         self.source_list = []
 
     # === SOURCE ==============================================================
 
     def add_source(self, source):
         self.source_list.append(source)
+        source.data_available.connect(self.data_available.emit)
 
     def set_source(self, source):
         if source not in self.source_list:

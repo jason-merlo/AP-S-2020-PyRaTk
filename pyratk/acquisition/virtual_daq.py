@@ -13,6 +13,7 @@ import threading                     # Used for creating thread and sync events
 import time
 import h5py
 from pyratk.datatypes.ts_data import TimeSeries
+from pyqtgraph import QtCore
 
 
 class VirtualDAQ(daq.DAQ):
@@ -20,6 +21,7 @@ class VirtualDAQ(daq.DAQ):
 
     def __init__(self):
         """Create virtual DAQ object to play back recording (hdf5 dataset)."""
+        super().__init__()
         # Attributes
         self.sample_rate = None
         self.sample_chunk_size = None
@@ -40,9 +42,6 @@ class VirtualDAQ(daq.DAQ):
 
         # Current time index of recording
         self.sample_index = 0
-
-        # Create sevent for controlling draw events only when there is new data
-        self.data_available = threading.Event()
 
         # Reset/load button sample thread locking
         self.reset_lock = threading.Event()
@@ -94,7 +93,7 @@ class VirtualDAQ(daq.DAQ):
             self.buffer.append((self.data, self.sample_index))
             self.ts_buffer.append(self.data)
             # Set the update event to True once data is read in
-            self.data_available.set()
+            self.data_available.emit()
 
             # Incriment time index and loop around at end of dataset
             self.sample_index = (self.sample_index + stride) % self.ds.shape[0]

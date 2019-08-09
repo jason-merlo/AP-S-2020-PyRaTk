@@ -10,6 +10,8 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 import h5py                     # Used for hdf5 database
 from pyratk.acquisition.mux_buffer import MuxBuffer
 from pyratk.acquisition.virtual_daq import VirtualDAQ
+from pyratk.acquisition import daq   # Extention of DAQ object
+
 
 # COMPRESSION OPTIONS
 COMPRESSION = "gzip"
@@ -32,12 +34,11 @@ class DataManager(MuxBuffer):
             db (optional)
                 database to save/load from
         """
+        super().__init__()
+
         self.db = None
         self.samples = None     # Pointer to the samples dataset
         self.labels = None      # Pointer to the labels dataset
-
-        # MuxBuffer attribute initialization
-        self.source_list = []
 
         # Open virtual daq for playback
         self.virt_daq = VirtualDAQ()

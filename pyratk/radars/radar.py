@@ -152,19 +152,25 @@ class Radar(object):
         # Get data from data_mgr
         channel_slice = 2 * self.index
         data_slice = data[channel_slice:channel_slice + 2]
-        iq_data_slice = data_slice[0, :] + data_slice[1, :] * 1.0j
+        # iq_data_slice = data_slice[0, :] + data_slice[1, :] * 1.0j
 
         # TODO remove ts_data, use data_mgr.ts_buffer instead
-        # self.ts_data.append(data_slice)
-        self.data_buffer = np.append(self.data_buffer, iq_data_slice)
+        self.ts_data.append(data_slice)
+        # self.data_buffer = np.append(self.data_buffer, iq_data_slice)
 
         # Get window of FFT data
-        window_slice = self.data_buffer[-self.window_size:]
+        # window_slice = self.data_buffer[-self.window_size:]
+        window_idx = self.window_size // self.data_mgr.sample_chunk_size
+        window_slice_pair = self.ts_data[-window_idx:, ...]
+        # print(window_slice_pair.shape)
+        window_slice = window_slice_pair[:, 0, :].flatten() \
+            + window_slice_pair[:, 1, :].flatten() * 1.0j
+        # print(window_slice.shape)
 
         # Calculate complex FFT (may be zero-padded if fft-size > sample_chunk_size)
-        start_time = time.time()
+        # start_time = time.time()
         self.cfft_data = self.compute_cfft(window_slice, self.fft_size)
-        print('compute_cfft time: ', time.time() - start_time)
+        # print('(radar.py) compute_cfft time: ', time.time() - start_time)
 
         # Find maximum frequency
         fmax_bin = np.argmax(self.cfft_data)

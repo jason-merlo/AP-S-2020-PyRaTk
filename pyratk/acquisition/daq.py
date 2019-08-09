@@ -9,20 +9,26 @@ TODO: Abstract base DAQ class from NI-DAQ class.
 Author: Jason Merlo
 Maintainer: Jason Merlo (merlojas@msu.edu)
 
-Dependencies: nidaqmx, random, threading, time, numpy
+Dependencies: nidaqmx, random, Threading, time, numpy
 """
 try:
     import nidaqmx              # Used for NI-DAQ hardware
     from nidaqmx import stream_readers
 except ImportError:
     print('Warning: nidaqmx module not imported')
+
 import threading                # Used for creating thread and sync events
 import time
 import numpy as np
+
+from pyqtgraph import QtCore
 from pyratk.datatypes.ts_data import TimeSeries
 
 
-class DAQ(object):
+class DAQ(QtCore.QThread):
+    # Create sevent for controlling draw events only when there is new data
+    data_available = QtCore.pyqtSignal()
+
     def __init__(self, daq_type="NI-DAQ",
                  sample_rate=44100, sample_chunk_size=4096,
                  # NI-DAQ specific
@@ -31,12 +37,15 @@ class DAQ(object):
         """
         Create sampling task on DAQ and opens I & Q channels for radars.
 
+        Emits a signal when new data is available.
+
         arguments:
         dev_string -- device and ports to initialize (default: "Dev1/ai0:7")
         sample_rate -- frequency in Hz to sample at (default: 44100)
         sample_mode -- finite or continuous acquisition (default: finite)
         sample_chunk_size -- size of chunk to read (default/max: 4095)
         """
+        super().__init__()
         # Copy member data
         # General arguments
         self.sample_rate = sample_rate
@@ -44,9 +53,6 @@ class DAQ(object):
         self.daq_type = daq_type
         self.paused = False  # Start running by default
         self.reset_flag = False
-
-        # Create sevent for controlling draw events only when there is new data
-        self.data_available = threading.Event()
 
         self.sample_num = 0
 
@@ -81,16 +87,16 @@ class DAQ(object):
                 # TODO: is there any reason to keep nidaqmx for windows?
                 # TODO: try performance comparison
                 self.daq_type = "FakeDAQ"
-                print("="*60)
+                print("="*80)
                 print("Warning: Using fake data. nidaqmx is not "
                       "supported on this platform.")
-                print("="*60)
+                print("="*80)
             except nidaqmx.errors.DaqError as e:
                 print(e)
                 self.daq_type = "FakeDAQ"
-                print("="*60)
+                print("="*80)
                 print("Warning: Using fake data. DAQ could not be detected.")
-                print("="*60)
+                print("="*80)
 
         elif self.daq_type == "PyAudioDAQ":
             pass  # TODO insert pyaudio support here
@@ -99,7 +105,7 @@ class DAQ(object):
         self.data = np.empty((self.num_channels, self.sample_chunk_size),)
 
         # Spawn sampling thread
-        self.run()
+        # self.run()
 
         # Create data buffers
         self.buffer = []
@@ -142,7 +148,7 @@ class DAQ(object):
 
         self.sample_num += 1
         # Set the update event to True once data is read in
-        self.data_available.set()
+        self.data_available.emit()
 
     # === CONTROL =======================================================
     def close(self):

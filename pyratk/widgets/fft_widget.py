@@ -95,7 +95,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
     def update_fft(self):
         if self.radar.cfft_data is not None:
             log_fft = 10 * np.log(self.radar.cfft_data)
-            max_log_fft = max(log_fft)
+            max_log_fft = np.max(log_fft)
             self.fft_pw.setData(log_fft)
             self.fft_pw.setPos(-self.radar.center_bin, 0)
 
