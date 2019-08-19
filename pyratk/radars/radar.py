@@ -123,7 +123,9 @@ class Radar(object):
         """Compute the velocity for a given frequency and the radar f0."""
         c = spc.speed_of_light
         velocity = (c * self.f0 / (freq + self.f0)) - c
-        return velocity
+
+        # DEBUG: ADDED FOR TESTING ON DAQ HARDWARE
+        return -velocity
 
     def bin_to_freq(self, bin):
         """Compute frequency based on bin location."""
@@ -205,81 +207,6 @@ class Radar(object):
         self.ts_v.clear()
         self.ts_a.clear()
 
-
-# class RadarArray(QtCore.QObject):
-#     """
-#     Hold timeseries data of array measurements.
-#
-#     Attributes:
-#         radars
-#             A list of radar objects in the array
-#
-#     """
-#
-#     def __init__(self, data_mgr, radar_list):
-#         """
-#         Initialize radar array.
-#
-#         Args:
-#             radar_list
-#                 List of Radar objects in array
-#         """
-#         super().__init__()
-#
-#         # copy arguments into member variables
-#         self.data_mgr = data_mgr
-#         self.radars = radar_list
-#         # self.initial_update = True
-#
-#         # Used for iterator magic functions
-#         self.idx = 0
-#
-#         # Flag to iqnore any stale data after a reset
-#         self.reset_flag = False
-#
-#         # Configure Signals
-#         self.connect_signals()
-#
-#     def connect_signals(self):
-#         self.data_mgr.data_available_signal.connect(self.update)
-#         self.data_mgr.reset_signal.connect(self.reset)
-#
-#     def reset(self):
-#         """Clear all temporal data from radars in array."""
-#         for radar in self.radars:
-#             radar.reset()
-#         self.reset_flag = True
-#
-#     def update(self, data_tuple):
-#         """Update all radars in array."""
-#         # start_time = time.time()
-#         data, sample_index = data_tuple
-#
-#         print('(radar.py) sample_num:', sample_index)
-#
-#         if not self.reset_flag or sample_index == 0:
-#             self.reset_flag = False
-#             for radar in self.radars:
-#                 radar.update(data)
-#
-#             # Emit data available signal for dependant tasks
-#             self.data_available_signal.emit()
-#         else:
-#             print('(radar.py) ignoring stale data...')
-#         # print('(radar.py) radar_array.update() ran in {:} (s)'
-#         #       .format(time.time() - start_time))
-#
-#     # Iterable functions
-#     def __iter__(self):
-#         return self
-#
-#     def __next__(self):
-#         try:
-#             return_value = self.radars[self.idx]
-#         except IndexError:
-#             raise StopIteration
-#             self.idx = 0
-#         return return_value
 
 class RadarArray(QtCore.QObject):
     """
