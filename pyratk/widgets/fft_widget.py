@@ -47,7 +47,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
 
         # Calculate reasonable ranges for FFT peak outputs
         fft_xrange = [-50 / self.radar.bin_size, 50 / self.radar.bin_size]
-        fft_yrange = [-100, 20]
+        fft_yrange = [-100, 0]
 
         # Add FFT plot
         self.fft_plot = self.addPlot()
@@ -59,7 +59,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.fft_plot.setRange(disableAutoRange=True,
                                xRange=fft_xrange, yRange=fft_yrange)
         self.fft_plot.setLimits(
-            xMin=fft_xrange[0], xMax=fft_xrange[1], yMin=-80, yMax=100)
+            xMin=fft_xrange[0], xMax=fft_xrange[1], yMin=-80, yMax=0)
         self.fft_pw = self.fft_plot.plot()
         self.fft_max_freq_line = pg.InfiniteLine(angle=90, movable=False)
         self.fft_max_pwr_line = pg.InfiniteLine(angle=0, movable=False)
