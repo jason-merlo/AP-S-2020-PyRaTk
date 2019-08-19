@@ -11,6 +11,7 @@ import h5py                     # Used for hdf5 database
 from pyratk.acquisition.mux_buffer import MuxBuffer
 from pyratk.acquisition.virtual_daq import VirtualDAQ
 from pyratk.acquisition import daq   # Extention of DAQ object
+from pyqtgraph import QtCore
 
 
 # COMPRESSION OPTIONS
@@ -25,6 +26,7 @@ class DataManager(MuxBuffer):
     Handles multiple data input sources and aggrigates them into one data
     "mux" which can select from the various input sources added.
     """
+    reset_signal = QtCore.pyqtSignal()
 
     def __init__(self, db="default.hdf5", daq=None):
         """
@@ -44,6 +46,8 @@ class DataManager(MuxBuffer):
         self.virt_daq = VirtualDAQ()
         self.add_source(self.virt_daq)
         self.daq = daq
+
+        self.source_reset_signal.connect(self.reset_signal.emit)
 
         # DEVEL/DEBUG
         try:
@@ -109,8 +113,10 @@ class DataManager(MuxBuffer):
 
     def load_dataset(self, ds):
         """Load dataset into virtualDAQ and set to virtualDAQ source."""
+        self.reset()
         self.virt_daq.load_dataset(ds)
         self.set_source(self.virt_daq)
+        self.reset()
 
     def get_datasets(self):
         """Return list of all dataset objects in 'samples' dataset."""
@@ -281,6 +287,7 @@ class DataManager(MuxBuffer):
     def reset(self):
         """Reset DAQ manager, clear all data and graphs."""
         self.source.reset()
+        self.reset_signal.emit()
 
     def pause_toggle(self):
         """Pauses the DAQ manager."""
@@ -299,13 +306,13 @@ class DataManager(MuxBuffer):
 
     # === PROPERTIES ====================================================
 
-    @property
-    def reset_flag(self):
-        return self.source.reset_flag
-
-    @reset_flag.setter
-    def reset_flag(self, a):
-        self.source.reset_flag = a
+    # @property
+    # def reset_flag(self):
+    #     return self.source.reset_flag
+    #
+    # @reset_flag.setter
+    # def reset_flag(self, a):
+    #     self.source.reset_flag = a
 
     @property
     def ts_buffer(self):

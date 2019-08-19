@@ -26,8 +26,9 @@ from pyratk.datatypes.ts_data import TimeSeries
 
 
 class DAQ(QtCore.QThread):
-    # Create sevent for controlling draw events only when there is new data
-    data_available = QtCore.pyqtSignal()
+    # Create event for processing new data only when available
+    data_available_signal = QtCore.pyqtSignal(tuple)
+    reset_signal = QtCore.pyqtSignal()
 
     def __init__(self, daq_type="NI-DAQ",
                  sample_rate=44100, sample_chunk_size=4096,
@@ -52,7 +53,6 @@ class DAQ(QtCore.QThread):
         self.sample_chunk_size = sample_chunk_size
         self.daq_type = daq_type
         self.paused = False  # Start running by default
-        self.reset_flag = False
 
         self.sample_num = 0
 
@@ -104,11 +104,7 @@ class DAQ(QtCore.QThread):
         # Create data member to store samples
         self.data = np.empty((self.num_channels, self.sample_chunk_size),)
 
-        # Spawn sampling thread
-        # self.run()
-
-        # Create data buffers
-        self.buffer = []
+        # Create data buffer for saving data
         length = 4096
         shape = (self.num_channels, self.sample_chunk_size)
         self.ts_buffer = TimeSeries(length, shape)
@@ -143,12 +139,14 @@ class DAQ(QtCore.QThread):
             except nidaqmx.errors.DaqError as err:
                 print("DAQ exception caught: {0}\n".format(err))
 
-        self.buffer.append((self.data, self.sample_num))
+        new_data = (self.data, self.sample_num)
+
+        # Set the update event to True once data is read in
+        self.data_available_signal.emit(new_data)
         self.ts_buffer.append(self.data)
 
+        # Incriment sample number
         self.sample_num += 1
-        # Set the update event to True once data is read in
-        self.data_available.emit()
 
     # === CONTROL =======================================================
     def close(self):
@@ -178,10 +176,8 @@ class DAQ(QtCore.QThread):
         self.paused = True
 
     def reset(self):
-        self.buffer = []
         self.ts_buffer.clear()
         self.sample_num = 0
-        self.reset_flag = True
 
     # === PROPERTIES ====================================================
     @property

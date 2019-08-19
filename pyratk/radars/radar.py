@@ -20,6 +20,7 @@ from pyratk.datatypes.geometry import Point      # radar location
 import time
 # import logging
 # import threading
+from pyqtgraph import QtCore
 
 
 # CONSTANTS
@@ -191,7 +192,82 @@ class Radar(object):
         self.ts_drho.clear()
 
 
-class RadarArray(list):
+# class RadarArray(QtCore.QObject):
+#     """
+#     Hold timeseries data of array measurements.
+#
+#     Attributes:
+#         radars
+#             A list of radar objects in the array
+#
+#     """
+#
+#     def __init__(self, data_mgr, radar_list):
+#         """
+#         Initialize radar array.
+#
+#         Args:
+#             radar_list
+#                 List of Radar objects in array
+#         """
+#         super().__init__()
+#
+#         # copy arguments into member variables
+#         self.data_mgr = data_mgr
+#         self.radars = radar_list
+#         # self.initial_update = True
+#
+#         # Used for iterator magic functions
+#         self.idx = 0
+#
+#         # Flag to iqnore any stale data after a reset
+#         self.reset_flag = False
+#
+#         # Configure Signals
+#         self.connect_signals()
+#
+#     def connect_signals(self):
+#         self.data_mgr.data_available_signal.connect(self.update)
+#         self.data_mgr.reset_signal.connect(self.reset)
+#
+#     def reset(self):
+#         """Clear all temporal data from radars in array."""
+#         for radar in self.radars:
+#             radar.reset()
+#         self.reset_flag = True
+#
+#     def update(self, data_tuple):
+#         """Update all radars in array."""
+#         # start_time = time.time()
+#         data, sample_index = data_tuple
+#
+#         print('(radar.py) sample_num:', sample_index)
+#
+#         if not self.reset_flag or sample_index == 0:
+#             self.reset_flag = False
+#             for radar in self.radars:
+#                 radar.update(data)
+#
+#             # Emit data available signal for dependant tasks
+#             self.data_available_signal.emit()
+#         else:
+#             print('(radar.py) ignoring stale data...')
+#         # print('(radar.py) radar_array.update() ran in {:} (s)'
+#         #       .format(time.time() - start_time))
+#
+#     # Iterable functions
+#     def __iter__(self):
+#         return self
+#
+#     def __next__(self):
+#         try:
+#             return_value = self.radars[self.idx]
+#         except IndexError:
+#             raise StopIteration
+#             self.idx = 0
+#         return return_value
+
+class RadarArray(QtCore.QObject):
     """
     Hold timeseries data of array measurements.
 
@@ -200,8 +276,9 @@ class RadarArray(list):
             A list of radar objects in the array
 
     """
+    data_available_signal = QtCore.pyqtSignal()
 
-    def __init__(self, radar_list):
+    def __init__(self, data_mgr, radar_list):
         """
         Initialize radar array.
 
@@ -209,22 +286,71 @@ class RadarArray(list):
             radar_list
                 List of Radar objects in array
         """
+        super().__init__()
+
         # copy arguments into member variables
+        self.data_mgr = data_mgr
         self.radars = radar_list
-        self.initial_update = True
+        # self.initial_update = True
 
         # Used for iterator magic functions
-        self.i = 0
+        self.idx = 0
+
+        # Flag to iqnore any stale data after a reset
+        self.last_sample_index = -1
+
+        # Configure Signals
+        self.connect_signals()
+
+    def connect_signals(self):
+        """Connect signals for event driven operation."""
+        self.data_mgr.data_available_signal.connect(self.update)
+        self.data_mgr.reset_signal.connect(self.reset)
 
     def reset(self):
         """Clear all temporal data from radars in array."""
         for radar in self.radars:
             radar.reset()
+        self.last_sample_index = -1
 
-    def update(self, data):
+    def update(self, data_tuple):
         """Update all radars in array."""
         # start_time = time.time()
-        for radar in self.radars:
-            radar.update(data)
+        data, sample_index = data_tuple
+
+        print('(radar.py) sample_num:', sample_index)
+
+        if sample_index == self.last_sample_index + 1:
+            self.reset_flag = False
+            for radar in self.radars:
+                radar.update(data)
+
+            # Emit data available signal for dependant tasks
+            self.data_available_signal.emit()
+        else:
+            print('(radar.py) ignoring stale data...')
+
+        self.last_sample_index = sample_index
         # print('(radar.py) radar_array.update() ran in {:} (s)'
         #       .format(time.time() - start_time))
+
+    def __getitem__(self, i):
+        """Return radar in array."""
+        assert(i < len(self)), "index greater than flattened array size"
+        return self.radars[i]
+
+    def __len__(self):
+        """Return length of radar array."""
+        # compute sumproduct of array shape
+        return len(self.radars)
+
+    def __iter__(self):
+        """Return self for iterator."""
+        return self
+
+    def __next__(self):
+        """Return next radar object for iterator."""
+        if self.idx < len(self):
+            self.idx += 1
+            return self[self.idx - 1]
+        raise StopIteration()

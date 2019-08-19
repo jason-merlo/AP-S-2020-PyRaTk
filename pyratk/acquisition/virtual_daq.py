@@ -30,9 +30,6 @@ class VirtualDAQ(daq.DAQ):
 
         # start paused if no dataset is selected
         self.paused = True
-
-        self.reset_flag = False
-
         # Fake sampler period
         self.sample_period = None
 
@@ -44,18 +41,15 @@ class VirtualDAQ(daq.DAQ):
         self.sample_index = 0
 
         # Reset/load button sample thread locking
-        self.reset_lock = threading.Event()
+        # self.reset_lock = threading.Event()
 
         self.t_sampling = threading.Thread(target=self.sample_loop)
-
-        self.buffer = []
 
     def load_dataset(self, ds):
         """Select dataset to read from and loads attributes."""
         if isinstance(ds, h5py._hl.dataset.Dataset):
-            self.reset()
             self.ds = ds
-            self.sample_index = 0
+            self.reset()
         else:
             raise(TypeError,
                   "load_dataset expects a h5py dataset type, got", type(ds))
@@ -75,7 +69,6 @@ class VirtualDAQ(daq.DAQ):
     def get_samples(self, stride=1, loop=-1, playback_speed=1.0):
         """Read sample from dataset at sampled speed, or one-by-one."""
         if (self.ds):
-            print("(virtual_daq, get_samples) Getting new sample")
             # Read in samples from dataset
             try:
                 self.data = self.ds[self.sample_index]
@@ -90,13 +83,18 @@ class VirtualDAQ(daq.DAQ):
             else:
                 raise ValueError("Value must be -1, 0, or 1.")
 
-            self.buffer.append((self.data, self.sample_index))
-            self.ts_buffer.append(self.data)
+            new_data = (self.data, self.sample_index)
             # Set the update event to True once data is read in
-            self.data_available.emit()
+            self.data_available_signal.emit(new_data)
+            self.ts_buffer.append(self.data)
 
             # Incriment time index and loop around at end of dataset
-            self.sample_index = (self.sample_index + stride) % self.ds.shape[0]
+            next_index = self.sample_index + stride
+            if next_index < self.ds.shape[0]:
+                self.sample_index = next_index
+            else:
+                self.reset_signal.emit()
+                self.sample_index = 0
 
             # Return True if more data
             return (self.sample_index + stride) % self.ds.shape[0] / stride < 1.0
@@ -107,7 +105,5 @@ class VirtualDAQ(daq.DAQ):
     def reset(self):
         """Reset all data to beginning of data file and begin playing."""
         self.close()
-        self.buffer.clear()
         self.sample_index = 0
-        self.reset_flag = True
         self.run()

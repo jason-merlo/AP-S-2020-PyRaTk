@@ -103,7 +103,7 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
                 rad = radar.ts_r[-2] #- radar.ts_v[-2] / radar.update_rate
                 # rad = radar.r
             except Exception as e:
-                print('Tracker widget exception:', e)
+                # print('Tracker widget exception:', e)
                 rad = 0
             # visualizer = 'vel_rad'
             visualizer = 'abs_rad'

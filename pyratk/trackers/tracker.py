@@ -63,6 +63,14 @@ class Tracker2D(object):
         init_length = 4096
         self.ts_track = TimeSeries(init_length, dtype=Point)
 
+        # Configure control signals
+        self.connect_signals()
+
+    def connect_signals(self):
+        """Initialize control signals."""
+        self.data_mgr.data_available_signal.connect(self.update)
+        self.data_mgr.reset_signal.connect(self.reset)
+
     def rho_to_r(self, rho, phi):
         """
         Compute 2D radius based on rho, phi, and z.
@@ -136,115 +144,96 @@ class Tracker2D(object):
             radar.ts_r.append(radar.r)
             radar.ts_a.append(0)
 
-    def update(self):
-        """Update position of track based on differential updates."""
-        # Loop through all new data that has arrived in the buffer
-        buffer = self.data_mgr.buffer
+    def update(self, data_tuple):
+        """
+        Update position of track based on differential updates.
 
-        # if not buffer:
-        #     print("(DEBUG, tracker.py) Nothing in buffer.")
-        # else:
-        #     print("(DEBUG, tracker.py) Updating tracker... Buffer size: ",
-        #           len(buffer))
+        Called by data_available_signal signal in DAQ.
 
-        tmp_loop_cnt = 0
-        # while buffer:
-        for cnt in range(4):
-            if not buffer:
-                break
-            tmp_loop_cnt += 1
-            # Remove oldest data in queue
-            data, sample_index = buffer.pop(0)
+        Args:
+            data_tuple (tuple) - tuple holding (sample_array, sample_number)
+        """
+        # Extract new data from tuple
+        data, sample_index = data_tuple
 
-            # Check for a virtual DAQ loop around
-            # TODO: is there a better place for this?
-            if sample_index == 0:
-                self.reset()
+        # Compute new measurements at each radar based on new data
+        # TODO: move this to main function, not triggered by tracker
+        # self.array.update(data)
 
-            # Compute new measurements at each radar based on new data
-            self.array.update(data)
+        ### VVV -- MOVE BELOW INTO SEPARATE FUNCTION --- VVV ###
+        """
+        # Check to see if this is the first iteration
+        # Cannot update without two measurements
+        if len(self.array.radars[0].ts_r) > 0:
+            intersections = []
+            # flatten radars list for combinations
+            flat_array = []
+            for ry in self.array.radars:
+                for rx in ry:
+                    flat_array.append(rx)
+            flat_array = flat_array[1:]
 
-            """
-            # Check to see if this is the first iteration
-            # Cannot update without two measurements
-            if len(self.array.radars[0].ts_r) > 0:
-                intersections = []
-                # flatten radars list for combinations
-                flat_array = []
-                for ry in self.array.radars:
-                    for rx in ry:
-                        flat_array.append(rx)
-                flat_array = flat_array[1:]
+            # find intersections between radar circles
+            for radar_pair in itertools.combinations(flat_array, 2):
+                print("tracker.py: radar_pair:", radar_pair)
+                # Get most recent radius data
+                r1 = radar_pair[0].ts_r.data[-1]
+                r2 = radar_pair[1].ts_r.data[-1]
 
-                # find intersections between radar circles
-                for radar_pair in itertools.combinations(flat_array, 2):
-                    print("tracker.py: radar_pair:", radar_pair)
-                    # Get most recent radius data
-                    r1 = radar_pair[0].ts_r.data[-1]
-                    r2 = radar_pair[1].ts_r.data[-1]
+                # Get radar locations
+                p1 = radar_pair[0].loc
+                p2 = radar_pair[1].loc
 
-                    # Get radar locations
-                    p1 = radar_pair[0].loc
-                    p2 = radar_pair[1].loc
+                # Create circle objects from radar information
+                c1 = Circle(p1, r1)
+                c2 = Circle(p2, r2)
+                # print(c1)
+                # print(c2)
 
-                    # Create circle objects from radar information
-                    c1 = Circle(p1, r1)
-                    c2 = Circle(p2, r2)
-                    # print(c1)
-                    # print(c2)
+                # Calculate all intersections, or nearest approximation
+                intersect = c1.intersections(c2)  # TODO check for bias
+                # print(intersect)
+                # print('='*50)
+                intersections.append(intersect)
 
-                    # Calculate all intersections, or nearest approximation
-                    intersect = c1.intersections(c2)  # TODO check for bias
-                    # print(intersect)
-                    # print('='*50)
-                    intersections.append(intersect)
+            # Find triangle with lowest area
+            potentials = itertools.product(*intersections)
+            lowest_area = -1
+            best_triangle = Triangle()
+            for p in potentials:
+                t = Triangle(*p)
+                # area = t.area  # TODO Cehck for zero bias
+                area = t.circumference
+                if (area < lowest_area or lowest_area == -1):
+                    lowest_area = area
+                    best_triangle = t
 
-                # Find triangle with lowest area
-                potentials = itertools.product(*intersections)
-                lowest_area = -1
-                best_triangle = Triangle()
-                for p in potentials:
-                    t = Triangle(*p)
-                    # area = t.area  # TODO Cehck for zero bias
-                    area = t.circumference
-                    if (area < lowest_area or lowest_area == -1):
-                        lowest_area = area
-                        best_triangle = t
+            # Set centroid of best triangle to new location
+            self.best_triangle = best_triangle
+            self.loc.x = best_triangle.centroid.x  # TODO check for bias
+            self.loc.y = best_triangle.centroid.y
 
-                # Set centroid of best triangle to new location
-                self.best_triangle = best_triangle
-                self.loc.x = best_triangle.centroid.x  # TODO check for bias
-                self.loc.y = best_triangle.centroid.y
+            if not math.isnan(self.loc.x):
+                print('Current location:', self.loc)
+            else:
+                print('Nan encountered, exiting...')
+                self.array.data_mgr.close()
+                sys.exit(0)
 
-                if not math.isnan(self.loc.x):
-                    print('Current location:', self.loc)
-                else:
-                    print('Nan encountered, exiting...')
-                    self.array.data_mgr.close()
-                    sys.exit(0)
+        # Append new location to track
+        p = Point(*self.loc.p)
+        self.ts_track.append(p)
 
-            # Append new location to track
-            p = Point(*self.loc.p)
-            self.ts_track.append(p)
-
-            for i, radar in enumerate(self.array):
-                # print("=== RADAR {:} ===".format(i))
-                self.update_relative_positions(radar)  # Updates radar.r
-                self.propagate_track_radius(radar)
-            """
-
-        print('(tracker.py) update_loops: ', tmp_loop_cnt)
+        for i, radar in enumerate(self.array):
+            # print("=== RADAR {:} ===".format(i))
+            self.update_relative_positions(radar)  # Updates radar.r
+            self.propagate_track_radius(radar)
+        """
 
     def reset(self):
         """Reset all temporal elements."""
         self.ts_track.clear()
-        self.array.reset()
         self.loc = self.start_loc.copy()
 
-    def update_loop(self, update_rate):
-        """Loop for updating tracker from thread."""
-        while True:
-            self.update()
-            time.sleep(1.0 / update_rate)
 # class TrackerEvaluator(Object):
 #     def __init__():

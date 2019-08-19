@@ -17,20 +17,27 @@ class MuxBuffer(QtCore.QObject):
     Handles multiple data input sources and aggrigates them into one data
     "mux" which can select from the various input sources added.
     """
-    data_available = QtCore.pyqtSignal()
+    data_available_signal = QtCore.pyqtSignal(tuple)
+    source_reset_signal = QtCore.pyqtSignal()
 
     def __init__(self):
         """Initialize MuxBuffer Class."""
         super().__init__()
         self.source_list = []
+        self.source = None
 
     # === SOURCE ==============================================================
 
     def add_source(self, source):
         self.source_list.append(source)
-        source.data_available.connect(self.data_available.emit)
+        source.data_available_signal.connect(self.data_available_signal.emit)
+        source.reset_signal.connect(self.source_reset_signal.emit)
 
     def set_source(self, source):
+        # Pause current source
+        if self.source:
+            self.source.close()
+        # Switch to new source, adding if necessisary
         if source not in self.source_list:
             self.add_source(source)
         self.source = source
@@ -59,9 +66,6 @@ class MuxBuffer(QtCore.QObject):
     def type(self):
         return self.source.type
 
-    @property
-    def buffer(self):
-        return self.source.buffer
 
     @property
     def paused(self):
