@@ -93,15 +93,15 @@ class Tracker2D(object):
         NOTE: Math varified
         """
         radar.rho_vec = self.loc - radar.loc
-        radar.r.append(Point(radar.rho_vec.x, radar.rho_vec.y).length)
+        radar.r = Point(radar.rho_vec.x, radar.rho_vec.y).length
 
         radar.theta = np.arctan2(radar.rho_vec.y, radar.rho_vec.x)
         # print(radar.rho_vec)
         assert(radar.rho_vec.z > 0), 'Implausibility: rho_vec.z <= 0'
         radar.phi = np.arctan(radar.r / radar.rho_vec.z)
 
-        # print('rho:{:+7.3}, phi:{:+7.3}, theta:{:+7.3}, r:{:+7.3}'.format(
-        # radar.rho_vec.length, radar.phi, radar.theta, radar.r))
+        print('rho:{:+7.3}, phi:{:+7.3}, theta:{:+7.3}, r:{:+7.3}'.format(
+            radar.rho_vec.length, radar.phi, radar.theta, radar.r))
 
     def propagate_track_radius(self, radar):
         """
@@ -144,38 +144,19 @@ class Tracker2D(object):
             radar.ts_r.append(radar.r)
             radar.ts_a.append(0)
 
-    def update(self, data_tuple):
-        """
-        Update position of track based on differential updates.
-
-        Called by data_available_signal signal in DAQ.
-
-        Args:
-            data_tuple (tuple) - tuple holding (sample_array, sample_number)
-        """
-        # Extract new data from tuple
-        data, sample_index = data_tuple
-
-        # Compute new measurements at each radar based on new data
-        # TODO: move this to main function, not triggered by tracker
-        # self.array.update(data)
-
-        ### VVV -- MOVE BELOW INTO SEPARATE FUNCTION --- VVV ###
-        """
+    def update_location_estimate(self, data):
+        """Generate new location estimate from measured data."""
         # Check to see if this is the first iteration
         # Cannot update without two measurements
         if len(self.array.radars[0].ts_r) > 0:
             intersections = []
             # flatten radars list for combinations
-            flat_array = []
-            for ry in self.array.radars:
-                for rx in ry:
-                    flat_array.append(rx)
+            flat_array = self.array.radars
             flat_array = flat_array[1:]
 
             # find intersections between radar circles
             for radar_pair in itertools.combinations(flat_array, 2):
-                print("tracker.py: radar_pair:", radar_pair)
+                # print("tracker.py: radar_pair:", radar_pair)
                 # Get most recent radius data
                 r1 = radar_pair[0].ts_r.data[-1]
                 r2 = radar_pair[1].ts_r.data[-1]
@@ -214,9 +195,9 @@ class Tracker2D(object):
             self.loc.y = best_triangle.centroid.y
 
             if not math.isnan(self.loc.x):
-                print('Current location:', self.loc)
+                print('(tracker.py) Current location:', self.loc)
             else:
-                print('Nan encountered, exiting...')
+                print('(tracker.py) Nan encountered, exiting...')
                 self.array.data_mgr.close()
                 sys.exit(0)
 
@@ -225,10 +206,22 @@ class Tracker2D(object):
         self.ts_track.append(p)
 
         for i, radar in enumerate(self.array):
-            # print("=== RADAR {:} ===".format(i))
+            print("=== RADAR {:} ===".format(i))
             self.update_relative_positions(radar)  # Updates radar.r
             self.propagate_track_radius(radar)
+
+    def update(self, data_tuple):
         """
+        Update position of track based on differential updates.
+
+        Called by data_available_signal signal in DAQ.
+
+        Args:
+            data_tuple (tuple) - tuple holding (sample_array, sample_number)
+        """
+        # Extract new data from tuple and update location estimate
+        data, sample_index = data_tuple
+        self.update_location_estimate(data)
 
     def reset(self):
         """Reset all temporal elements."""

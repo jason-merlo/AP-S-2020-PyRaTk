@@ -102,6 +102,9 @@ class Radar(object):
         self.ts_v = TimeSeries(length)
         self.ts_a = TimeSeries(length)
 
+        # DEBUG: TEMP VARIABLES TO TEST TRACKER
+        self.r = 0
+
         # Initialize hardare accelration
         self.cluda_thread = cluda_thread
         # if self.cluda_thread is not None:
@@ -110,6 +113,11 @@ class Radar(object):
         #     print('Compiling FFT...')
         #     self.compiled_fft = reikna_fft.compile(cluda_thread)
         #     print('Configuring FFT Completed.')
+
+        self.connect_signals()
+
+    def connect_signals(self):
+        self.data_mgr.reset_signal.connect(self.reset)
 
     def freq_to_vel(self, freq):
         """Compute the velocity for a given frequency and the radar f0."""
@@ -190,6 +198,12 @@ class Radar(object):
     def reset(self):
         self.ts_data.clear()
         self.ts_drho.clear()
+
+        # DEBUG ADDED FOR TESTING TRACKER
+        self.r = 0
+        self.ts_r.clear()
+        self.ts_v.clear()
+        self.ts_a.clear()
 
 
 # class RadarArray(QtCore.QObject):
@@ -352,5 +366,7 @@ class RadarArray(QtCore.QObject):
         """Return next radar object for iterator."""
         if self.idx < len(self):
             self.idx += 1
-            return self[self.idx - 1]
-        raise StopIteration()
+            return self.radars[self.idx - 1]
+        else:
+            self.idx = 0
+            raise StopIteration()
