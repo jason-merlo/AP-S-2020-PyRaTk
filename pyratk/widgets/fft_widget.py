@@ -36,6 +36,10 @@ class FftWidget(pg.GraphicsLayoutWidget):
             self.vmax_plot.setLimits(
                 xMax=0, yMax=20, yMin=-20)
             self.vmax_pw = self.vmax_plot.plot()
+
+            self.vmax_line = pg.InfiniteLine(angle=0, movable=False)
+            self.vmax_plot.addItem(self.vmax_line)
+
             # self.a_pw = self.vmax_plot.plot()
             self.vmax_plot.setLabel('left', text="Radial Velocity", units="m/s")
             self.vmax_ax_bottom = self.vmax_plot.getAxis('bottom')
@@ -80,6 +84,8 @@ class FftWidget(pg.GraphicsLayoutWidget):
         vmax_ptr = self.radar.ts_drho.head_ptr
         self.vmax_pw.setData(vmax_data, pen=pg.mkPen({'color': "FFF"}))
         self.vmax_pw.setPos(-vmax_ptr, 0)
+
+        self.vmax_line.setValue(vmax_data[-1])
 
         # a_data = self.radar.ts_a.data
         # a_ptr = self.radar.ts_a.head_ptr
