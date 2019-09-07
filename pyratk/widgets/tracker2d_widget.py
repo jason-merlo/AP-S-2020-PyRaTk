@@ -40,17 +40,17 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         # Add radar detection radius circles
         self.radar_rad_plots = []
         for i in range(len(self.tracker.array)):
-            curve = pg.PlotCurveItem()
+            circle = pg.PlotCurveItem()
 
             # Add initial radii
             radar = self.tracker.array[i]
-            self.draw_circle(curve, Circle(radar.loc, 0))
+            self.draw_circle(circle, Circle(radar.loc, 0))
 
             # Add to list to keep track
-            self.radar_rad_plots.append(curve)
+            self.radar_rad_plots.append(circle)
 
             # Add to plot
-            self.plot.addItem(curve)
+            self.plot.addItem(circle)
 
         # Add triangle for tracker
         self.tracker_triangle = pg.PlotCurveItem()
@@ -111,14 +111,14 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
             if vel < 0:
                 vel = -vel
                 if visualizer == 'abs_rad':
-                    color = (*color_neg, 64)
+                    color = (*color_neg, 128)
                     self.draw_circle(pt, Circle(radar.loc, rad), color=color)
                 elif visualizer == 'vel_rad':
                     color = (*color_neg, 64)
                     self.draw_circle(pt, Circle(radar.loc, vel), color=color)
             else:
                 if visualizer == 'abs_rad':
-                    color = (*color_pos, 64)
+                    color = (*color_pos, 128)
                     self.draw_circle(pt, Circle(radar.loc, rad), color=color)
                 elif visualizer == 'vel_rad':
                     color = (*color_pos, 64)
@@ -138,8 +138,8 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         two_pi = 2 * np.pi
         for i in range(num_pts):
             ang = two_pi * (i / num_pts)
-            x = (np.cos(ang) * cir.r / 2) + cir.c.x
-            y = (np.sin(ang) * cir.r / 2) + cir.c.y
+            x = (np.cos(ang) * cir.r) + cir.c.x
+            y = (np.sin(ang) * cir.r) + cir.c.y
             x_list.append(x)
             y_list.append(y)
         # append first point to end to 'close' circle
@@ -151,7 +151,8 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
 
         pixel_size = self.ppm()
         curve.setData(x, y, pen=pg.mkPen(
-            {'color': color, 'width': cir.r * pixel_size}))
+            {'color': color, 'width': 3}))
+
 
     def draw_triangle(self, curve, pts, color="AAFFFF16"):
         """Create triangle object from points."""
