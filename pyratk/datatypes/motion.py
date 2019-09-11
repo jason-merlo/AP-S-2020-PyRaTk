@@ -17,8 +17,10 @@ class StateMatrix(object):
         'spherical': ('rho', 'theta', 'phi')
     }
 
-    def __init__(self, mat, coordinate_type='cartesian'):
+    def __init__(self, mat, coordinate_type='cartesian',
+                 axis_type='column_major'):
         """Initialize matrix and coordinate type."""
+        # TODO: Add row_major axis type
         # Check coordinate type
         if coordinate_type not in self.coordinate_types.keys():
             raise ValueError("Coordinate type must be one of the following:",
@@ -40,12 +42,12 @@ class StateMatrix(object):
         return self.q.shape[0]
 
     def __getitem__(self, idx):
-        """Return outer dimension of matrix."""
+        """Return item at index of matrix."""
         return self.q[idx]
 
-    def __copy__(self):
+    def copy(self):
         """Return copy of self."""
-        return StateMatrix(self.q)
+        return StateMatrix(self.q, coordinate_type=self.coordinate_type)
 
     def __repr__(self):
         """Print StateMatrix to output stream."""
@@ -56,12 +58,12 @@ class StateMatrix(object):
         elif self.coordinate_type == 'spherical':
             coord_list = self.coordinate_types['spherical']
 
-        ret_str = '\n' + ' '*6 + '{:^7}{:^7}{:^7}'.format(*coord_list)
+        ret_str = '\n' + ' '*6 + ' {:^9} {:^9} {:^9}'.format(*coord_list)
 
         # loop through all indexes in each state vector
         derivative_list = ('pos', 'vel', 'acc')
         for i in range(3):
-            ret_str += '\n{:>6}{:+7.3}{:+7.3}{:+7.3}'.format(
+            ret_str += '\n{:>6} {:>+9.3} {:>+9.3} {:>+9.3}'.format(
                 derivative_list[i], self.x[i], self.y[i], self.z[i]
             )
         return ret_str + '\n'
