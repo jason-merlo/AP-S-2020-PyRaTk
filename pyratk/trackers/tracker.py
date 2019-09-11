@@ -106,7 +106,7 @@ class Tracker2D(object):
             r_hat = Point(rho[0], rho[1])  # Constrain z
             r_hat.normalize()
 
-            print('(tracker.py) radar', radar.index, 'r_hat', r_hat)
+            # print('(tracker.py) radar', radar.index, 'r_hat', r_hat)
 
             # Compute angle between track and z-axis for each radar
             phi = np.arctan2(np.sqrt(rho.x**2 + rho.y**2), rho.z)
@@ -120,12 +120,12 @@ class Tracker2D(object):
         average_velocity_vector /= len(self.radar_array)
 
 
-        print('(tracker.py) v_bar:\n', average_velocity_vector)
+        # print('(tracker.py) v_bar:\n', average_velocity_vector)
 
         # Update state matrix based on fused data
-        self.location.q[:, 1] = average_velocity_vector * 2
+        self.location.q[:, 1] = average_velocity_vector * 4
         self.location.q[:, 0] += self.location.q[:, 1] * self.data_mgr.source.update_period
-        print(self.location)
+        # print(self.location)
 
     # ====== CONTROL METHODS ================================================= #
     def update(self, data_tuple):
