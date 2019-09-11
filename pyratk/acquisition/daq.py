@@ -51,6 +51,7 @@ class DAQ(QtCore.QThread):
         # General arguments
         self.sample_rate = sample_rate
         self.sample_chunk_size = sample_chunk_size
+        self.update_period = sample_chunk_size / sample_rate
         self.daq_type = daq_type
         self.paused = False  # Start running by default
 
