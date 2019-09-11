@@ -10,7 +10,7 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 import pyqtgraph as pg          # Used for RadarWidget superclass
 import numpy as np              # Used for numerical operations
 import platform                 # Get OS for DPI scaling
-from pyratk.datatypes.geometry import Circle
+from pyratk.datatypes.geometry import Point, Circle
 
 
 class Tracker2dWidget(pg.GraphicsLayoutWidget):
@@ -31,7 +31,7 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         self.radar_loc_plot = pg.ScatterPlotItem(
             size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 0, 255))
 
-        for radar in self.tracker.array:
+        for radar in self.tracker.radar_array:
             loc = (radar.loc.x, radar.loc.y)
             self.radar_loc_plot.addPoints(pos=[loc])
 
@@ -39,11 +39,11 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
 
         # Add radar detection radius circles
         self.radar_rad_plots = []
-        for i in range(len(self.tracker.array)):
+        for i in range(len(self.tracker.radar_array)):
             circle = pg.PlotCurveItem()
 
             # Add initial radii
-            radar = self.tracker.array[i]
+            radar = self.tracker.radar_array[i]
             self.draw_circle(circle, Circle(radar.loc, 0))
 
             # Add to list to keep track
@@ -73,8 +73,8 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         Draws track trail and radar circles on tracker2d graph
         '''
         # === Draw trace line =========
-        data = self.tracker.ts_track.data[-self.trail:]
-        data = np.array([(p.x, p.y) for p in data])
+        data = self.tracker.ts_location.data[-self.trail:, :, 0]
+        data = np.array([(p[0], p[1]) for p in data])
         self.pw.setData(data, pen=pg.mkPen({'color': "FFF", 'width': 2}))
 
         # === Draw tracker triangle ===
@@ -94,34 +94,34 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         color_neg = (255, 160, 160)
 
         for i, pt in enumerate(self.radar_rad_plots):
-            radar = self.tracker.array[i]
-            vel = radar.vmax / 10   # scaled to fit on screen;
+            radar = self.tracker.radar_array[i]
+            vel = radar.drho / 10   # scaled to fit on screen;
             #                       # Velocity of highest intensity return
             try:
-                # Verify what time-step each of these is at
-                # This is assuming radar.r is at t-1 and radar.vmax is at t
-                rad = radar.ts_r[-2] #- radar.ts_v[-2] / radar.update_rate
-                # rad = radar.r
+                rad_vec = Point(*self.tracker.ts_location[-1, :, 0]) - radar.loc
+                rad_vec.z = 0.0
+                rad = rad_vec.length
             except Exception as e:
                 # print('Tracker widget exception:', e)
                 rad = 0
             # visualizer = 'vel_rad'
-            visualizer = 'abs_rad'
+            visualizer = 'vel_rad'
 
+            vel = -vel * 2
             if vel < 0:
                 vel = -vel
                 if visualizer == 'abs_rad':
                     color = (*color_neg, 128)
                     self.draw_circle(pt, Circle(radar.loc, rad), color=color)
                 elif visualizer == 'vel_rad':
-                    color = (*color_neg, 64)
+                    color = (*color_neg, 128)
                     self.draw_circle(pt, Circle(radar.loc, vel), color=color)
             else:
                 if visualizer == 'abs_rad':
                     color = (*color_pos, 128)
                     self.draw_circle(pt, Circle(radar.loc, rad), color=color)
                 elif visualizer == 'vel_rad':
-                    color = (*color_pos, 64)
+                    color = (*color_pos, 128)
                     self.draw_circle(pt, Circle(radar.loc, vel), color=color)
 
     def reset(self):
@@ -129,28 +129,28 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         self.update()
 
     # === UTILITY FUNCTIONS ===================================================
-    def draw_circle(self, curve, cir, num_pts=50, color="AAFFFF16"):
+    def draw_circle(self, curve, cir, num_pts=100, color="AAFFFF16"):
         '''
         adds a Circle, c, to the plot
         '''
         x_list = []
         y_list = []
-        two_pi = 2 * np.pi
+
         for i in range(num_pts):
-            ang = two_pi * (i / num_pts)
+            ang = 2 * np.pi * (i / num_pts)
             x = (np.cos(ang) * cir.r) + cir.c.x
             y = (np.sin(ang) * cir.r) + cir.c.y
             x_list.append(x)
             y_list.append(y)
+
         # append first point to end to 'close' circle
         x_list.append(x_list[0])
         y_list.append(y_list[0])
 
-        x = np.array(x_list)
-        y = np.array(y_list)
+        x_pts = np.array(x_list)
+        y_pts = np.array(y_list)
 
-        pixel_size = self.ppm()
-        curve.setData(x, y, pen=pg.mkPen(
+        curve.setData(x=x_pts, y=y_pts, pen=pg.mkPen(
             {'color': color, 'width': 3}))
 
 

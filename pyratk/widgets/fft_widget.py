@@ -23,7 +23,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.vmax_len = vmax_len
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
-        self.show_max_plot = show_max_plot
+        self.show_max_plot = show_max_plot and False
 
         # Add FFT max plot to layout
         if show_max_plot:
