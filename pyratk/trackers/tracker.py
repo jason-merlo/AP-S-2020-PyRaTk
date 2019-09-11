@@ -7,12 +7,8 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 """
 import numpy as np                            # Storing data
 from pyratk.datatypes.ts_data import TimeSeries                # storing data
-from pyratk.datatypes.geometry import Point, Circle, Triangle
-import itertools                              # 'triangulating' radar radii
-import math
-import sys
-import time
-import logging
+from pyratk.datatypes.motion import StateMatrix
+from pyratk.datatypes.geometry import Point
 
 # DEBUG
 USE_LPF = True
@@ -21,8 +17,12 @@ USE_LPF = True
 class Tracker2D(object):
     """Class to track detections using 4 doppler measurements."""
 
+    # === INITIALIZATION METHODS ============================================= #
     def __init__(self, data_mgr, radar_array, dim=1, constraint='auto',
-                 start_loc=Point(0.0, 0.0, 0.26035)):  # Height of top in m
+                 start_loc=StateMatrix(mat=np.array([[0.0, 0.0, 0.26035],
+                                                     [0.0, 0.0,     0.0],
+                                                     [0.0, 0.0,     0.0]]),
+                                       coordinate_type='cartesian')):
         """
         Initialize tracker class.
 
@@ -56,24 +56,27 @@ class Tracker2D(object):
 
         # copy arguments into attributes
         self.data_mgr = data_mgr
-        self.array = radar_array
-        self.start_loc = start_loc
-        self.loc = self.start_loc.copy()
+        self.radar_array = radar_array
+        self.start_loc = start_loc.q.copy()
+        self.location = StateMatrix(self.start_loc.copy())
 
-        init_length = 4096
-        self.ts_track = TimeSeries(init_length, dtype=Point)
+        init_track_length = 4096
+        self.ts_location = TimeSeries(init_track_length,
+                                      (3, 3),
+                                      dtype=np.float64)
 
         # Configure control signals
-        self.connect_signals()
+        self.connect_control_signals()
 
-    def connect_signals(self):
+    def connect_control_signals(self):
         """Initialize control signals."""
         self.data_mgr.data_available_signal.connect(self.update)
         self.data_mgr.reset_signal.connect(self.reset)
 
+    # === HELPER METHODS ===================================================== #
     def rho_to_r(self, rho, phi):
         """
-        Compute 2D radius based on rho, phi, and z.
+        Compute 2D radius based on rho and phi.
 
            r
         ______
@@ -86,130 +89,45 @@ class Tracker2D(object):
         """
         return rho * np.sin(phi)
 
-    def update_relative_positions(self, radar):
+    # ====== TRACKING METHODS ================================================ #
+    def update_fused_state_estimate(self, data):
         """
-        Update rho, phi, theta, and r, of the track relative to the radar.
+        Compute the fused of state estimate from all radars in array.
 
-        NOTE: Math varified
+        Currently fusion method is averaging all motion vectors.
+        Assumptions:
+            z-height is constant.
         """
-        radar.rho_vec = self.loc - radar.loc
-        radar.r = Point(radar.rho_vec.x, radar.rho_vec.y).length
+        average_velocity_vector = Point()
 
-        radar.theta = np.arctan2(radar.rho_vec.y, radar.rho_vec.x)
-        # print(radar.rho_vec)
-        assert(radar.rho_vec.z > 0), 'Implausibility: rho_vec.z <= 0'
-        radar.phi = np.arctan(radar.r / radar.rho_vec.z)
+        for radar in self.radar_array:
+            # Compute unit vector from radar towards track location
+            rho = Point(*self.location[:, 0]) - radar.loc
+            r_hat = Point(rho[0], rho[1])  # Constrain z
+            r_hat.normalize()
 
-        print('rho:{:+7.3}, phi:{:+7.3}, theta:{:+7.3}, r:{:+7.3}'.format(
-            radar.rho_vec.length, radar.phi, radar.theta, radar.r))
+            print('(tracker.py) radar', radar.index, 'r_hat', r_hat)
 
-    def propagate_track_radius(self, radar):
-        """
-        Calculate new detection radius from current location and measurement.
+            # Compute angle between track and z-axis for each radar
+            phi = np.arctan2(np.sqrt(rho.x**2 + rho.y**2), rho.z)
 
-        Based on the current location of the tracked object, the new radius
-        is calculated by propagating the location by the integrated velocity
-        measured by the radar over the sampling period.
+            # Assign vector length to measured Doppler velocity
+            dr = r_hat * radar.drho / np.cos(np.pi - phi)
 
-        Args:
-            radar
-                Radar object to update
-        """
-        # Append new data
-        if len(radar.ts_v) > 0 and USE_LPF:
-            # Low-pass filter
-            radial_vel = self.rho_to_r(
-                radar.vmax, radar.phi) * 0.5 + radar.ts_v[-1] * 0.5
-        else:
-            radial_vel = self.rho_to_r(radar.vmax, radar.phi)
-        radar.ts_v.append(radial_vel)
+            # Add radar measurement vector to average
+            average_velocity_vector += dr
 
-        # Need a time delta (two samples) before position can be updated
-        if len(radar.ts_a) > 0:
-            dt = 1.0 / radar.update_rate * 4  # Why is this multiplied by 4?
-            r = radar.r  # radar.ts_r.data[-1]
-            v = radar.ts_v.data[-1]
-            a = radar.ts_a.data[-1]
+        average_velocity_vector /= len(self.radar_array)
 
-            # Calculate radius and acceleration
-            ap = (v - radar.ts_v.data[-2]) / dt
-            rp = r + v * dt + 0.5 * a * dt**2
-            radar.ts_a.append(ap)
-            radar.ts_r.append(rp)
-            # print('new values: \
-            #       r: {: +7.3f}, v: {: +7.3f}, a: {: +7.3f}, dt: {: +7.3f}'
-            #       .format(rp, v, ap, dt))
-        else:
-            # Append initial values
-            radar.ts_r.append(radar.r)
-            radar.ts_a.append(0)
 
-    def update_location_estimate(self, data):
-        """Generate new location estimate from measured data."""
-        # Check to see if this is the first iteration
-        # Cannot update without two measurements
-        if len(self.array.radars[0].ts_r) > 0:
-            intersections = []
-            # flatten radars list for combinations
-            flat_array = self.array.radars
-            flat_array = flat_array[1:]
+        print('(tracker.py) v_bar:\n', average_velocity_vector)
 
-            # find intersections between radar circles
-            for radar_pair in itertools.combinations(flat_array, 2):
-                # print("tracker.py: radar_pair:", radar_pair)
-                # Get most recent radius data
-                r1 = radar_pair[0].ts_r.data[-1]
-                r2 = radar_pair[1].ts_r.data[-1]
+        # Update state matrix based on fused data
+        self.location.q[:, 1] = average_velocity_vector * 2
+        self.location.q[:, 0] += self.location.q[:, 1] * self.data_mgr.source.update_period
+        print(self.location)
 
-                # Get radar locations
-                p1 = radar_pair[0].loc
-                p2 = radar_pair[1].loc
-
-                # Create circle objects from radar information
-                c1 = Circle(p1, r1)
-                c2 = Circle(p2, r2)
-                # print(c1)
-                # print(c2)
-
-                # Calculate all intersections, or nearest approximation
-                intersect = c1.intersections(c2)  # TODO check for bias
-                # print(intersect)
-                # print('='*50)
-                intersections.append(intersect)
-
-            # Find triangle with lowest area
-            potentials = itertools.product(*intersections)
-            lowest_area = -1
-            best_triangle = Triangle()
-            for p in potentials:
-                t = Triangle(*p)
-                # area = t.area  # TODO Cehck for zero bias
-                area = t.circumference
-                if (area < lowest_area or lowest_area == -1):
-                    lowest_area = area
-                    best_triangle = t
-
-            # Set centroid of best triangle to new location
-            self.best_triangle = best_triangle
-            self.loc.x = best_triangle.centroid.x  # TODO check for bias
-            self.loc.y = best_triangle.centroid.y
-
-            if not math.isnan(self.loc.x):
-                print('(tracker.py) Current location:', self.loc)
-            else:
-                print('(tracker.py) Nan encountered, exiting...')
-                self.array.data_mgr.close()
-                sys.exit(0)
-
-        # Append new location to track
-        p = Point(*self.loc.p)
-        self.ts_track.append(p)
-
-        for i, radar in enumerate(self.array):
-            print("=== RADAR {:} ===".format(i))
-            self.update_relative_positions(radar)  # Updates radar.r
-            self.propagate_track_radius(radar)
-
+    # ====== CONTROL METHODS ================================================= #
     def update(self, data_tuple):
         """
         Update position of track based on differential updates.
@@ -221,12 +139,20 @@ class Tracker2D(object):
         """
         # Extract new data from tuple and update location estimate
         data, sample_index = data_tuple
-        self.update_location_estimate(data)
+
+        # Compute new track location
+        self.update_fused_state_estimate(data)
+
+        # Add state matrix to TimeSeries
+        self.ts_location.append(self.location.q)
+
+        print("(tracker.py) initial_location: ",self.ts_location[0])
 
     def reset(self):
         """Reset all temporal elements."""
-        self.ts_track.clear()
-        self.loc = self.start_loc.copy()
+        print("(tracker.py) Resetting tracker...")
+        self.location.q = self.start_loc.copy()
+        self.ts_location.clear()
 
 # class TrackerEvaluator(Object):
 #     def __init__():
