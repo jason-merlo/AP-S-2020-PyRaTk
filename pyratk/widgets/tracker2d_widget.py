@@ -125,7 +125,7 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
                     self.draw_circle(pt, Circle(radar.loc, vel), color=color)
 
     def reset(self):
-        self.tracker.reset()
+        # self.tracker.reset()
         self.update()
 
     # === UTILITY FUNCTIONS ===================================================

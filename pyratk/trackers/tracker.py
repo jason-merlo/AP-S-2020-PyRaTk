@@ -13,15 +13,21 @@ from pyratk.datatypes.geometry import Point
 # DEBUG
 USE_LPF = True
 
+RED   = "\033[1;31m"
+BLUE  = "\033[1;34m"
+CYAN  = "\033[1;36m"
+GREEN = "\033[0;32m"
+RESET = "\033[0;0m"
+BOLD    = "\033[;1m"
 
 class Tracker2D(object):
     """Class to track detections using 4 doppler measurements."""
 
     # === INITIALIZATION METHODS ============================================= #
     def __init__(self, data_mgr, radar_array, dim=1, constraint='auto',
-                 start_loc=StateMatrix(mat=np.array([[0.0, 0.0, 0.26035],
-                                                     [0.0, 0.0,     0.0],
-                                                     [0.0, 0.0,     0.0]]),
+                 start_loc=StateMatrix(mat=np.array([[0.0, 0.0, 0.0],
+                                                     [0.0, 0.0, 0.0],
+                                                     [0.26035, 0.0, 0.0]]),
                                        coordinate_type='cartesian')):
         """
         Initialize tracker class.
@@ -65,12 +71,15 @@ class Tracker2D(object):
                                       (3, 3),
                                       dtype=np.float64)
 
+        # append initial location
+        self.ts_location.append(self.location.q)
+
         # Configure control signals
         self.connect_control_signals()
 
     def connect_control_signals(self):
         """Initialize control signals."""
-        self.data_mgr.data_available_signal.connect(self.update)
+        self.radar_array.data_available_signal.connect(self.update)
         self.data_mgr.reset_signal.connect(self.reset)
 
     # === HELPER METHODS ===================================================== #
@@ -90,7 +99,7 @@ class Tracker2D(object):
         return rho * np.sin(phi)
 
     # ====== TRACKING METHODS ================================================ #
-    def update_fused_state_estimate(self, data):
+    def update_fused_state_estimate(self):
         """
         Compute the fused of state estimate from all radars in array.
 
@@ -101,58 +110,57 @@ class Tracker2D(object):
         average_velocity_vector = Point()
 
         for radar in self.radar_array:
-            # Compute unit vector from radar towards track location
+            # Compute unit vector from radar towards the target
             rho = Point(*self.location[:, 0]) - radar.loc
-            r_hat = Point(rho[0], rho[1])  # Constrain z
+            r = Point(rho[0], rho[1])  # Project onto x-y plane
+            r_hat = r.copy()
             r_hat.normalize()
 
-            # print('(tracker.py) radar', radar.index, 'r_hat', r_hat)
+            # Compute elevation angle relative to radar
+            # # Compute angle between track and z-axis for each radar
+            phi = np.arctan2(r.length, rho.z)
 
-            # Compute angle between track and z-axis for each radar
-            phi = np.arctan2(np.sqrt(rho.x**2 + rho.y**2), rho.z)
+            # Compute angle between target bearing and radar
+            # psi = np.arccos(r.length, )
 
             # Assign vector length to measured Doppler velocity
-            dr = r_hat * radar.drho / np.cos(np.pi - phi)
+            dr = r_hat * radar.drho / np.sin(phi)
+            print("dr:\t", dr)
 
             # Add radar measurement vector to average
             average_velocity_vector += dr
 
         average_velocity_vector /= len(self.radar_array)
 
-
-        # print('(tracker.py) v_bar:\n', average_velocity_vector)
-
         # Update state matrix based on fused data
-        self.location.q[:, 1] = average_velocity_vector * 4
+        self.location.q[:, 1] = average_velocity_vector
         self.location.q[:, 0] += self.location.q[:, 1] * self.data_mgr.source.update_period
+
+        print('(tracker.py) v_bar:\t', self.location.q[:, 1])
         # print(self.location)
 
     # ====== CONTROL METHODS ================================================= #
-    def update(self, data_tuple):
+    def update(self):
         """
         Update position of track based on differential updates.
 
         Called by data_available_signal signal in DAQ.
-
-        Args:
-            data_tuple (tuple) - tuple holding (sample_array, sample_number)
         """
-        # Extract new data from tuple and update location estimate
-        data, sample_index = data_tuple
 
         # Compute new track location
-        self.update_fused_state_estimate(data)
+        self.update_fused_state_estimate()
 
         # Add state matrix to TimeSeries
         self.ts_location.append(self.location.q)
 
-        print("(tracker.py) initial_location: ",self.ts_location[0])
+        print("(tracker.py) initial_location: \n", self.ts_location[0])
 
     def reset(self):
         """Reset all temporal elements."""
-        print("(tracker.py) Resetting tracker...")
+        print("(tracker.py) Resetting tracker...", self.start_loc.copy())
         self.location.q = self.start_loc.copy()
         self.ts_location.clear()
+        self.ts_location.append(self.location.q)
 
 # class TrackerEvaluator(Object):
 #     def __init__():

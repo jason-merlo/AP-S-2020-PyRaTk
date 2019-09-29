@@ -17,6 +17,8 @@ from pyratk.datatypes.geometry import Point         # radar location
 # from pyratk.datatypes.motion import StateMatrix   # track location
 from pyqtgraph import QtCore
 
+from formatting import warning
+
 
 # CONSTANTS
 POWER_THRESHOLD = 4  # dBm
@@ -85,10 +87,10 @@ class Radar(object):
         # negative --> towards radar; positive --> away from radar
         self.drho = 0
 
-        self.connect_signals()
-
-    def connect_signals(self):
-        self.data_mgr.reset_signal.connect(self.reset)
+    #     self.connect_signals()
+    #
+    # def connect_signals(self):
+    #     self.data_mgr.reset_signal.connect(self.reset)
 
     # === HELPER METHODS ======================================================
     def freq_to_vel(self, freq):
@@ -97,7 +99,7 @@ class Radar(object):
         # velocity = (c * self.f0 / (freq + self.f0)) - c
         velocity = (freq * c) / (2 * self.f0)
 
-        return -velocity
+        return velocity
 
     def bin_to_freq(self, bin):
         """Compute frequency based on bin location."""
@@ -154,9 +156,11 @@ class Radar(object):
         #     self.fmax = self.bin_to_freq(vmax_bin)
 
         self.drho = self.freq_to_vel(self.fmax)
+        print('(radar.py) radar', self.index, 'drho:', self.drho)
 
     def reset(self):
         """Reset all radar data."""
+        print("(radar.py) Resetting radar {:}...".format(self.index))
         self.ts_data.clear()
 
 
@@ -220,10 +224,12 @@ class RadarArray(QtCore.QObject):
 
             # Emit data available signal for dependant tasks
             self.data_available_signal.emit()
-        else:
-            print('(radar.py) ignoring stale data...')
 
-        self.last_sample_index = sample_index
+            self.last_sample_index = sample_index
+        else:
+            print('(radar.py) last_sample_index:', self.last_sample_index)
+            warning('(radar.py) ignoring stale data...')
+
         # print('(radar.py) radar_array.update() ran in {:} (s)'
         #       .format(time.time() - start_time))
 

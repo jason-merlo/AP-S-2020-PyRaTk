@@ -113,7 +113,7 @@ class DataManager(MuxBuffer):
 
     def load_dataset(self, ds):
         """Load dataset into virtualDAQ and set to virtualDAQ source."""
-        self.reset()
+        # self.reset()
         self.virt_daq.load_dataset(ds)
         self.set_source(self.virt_daq)
         self.reset()
@@ -286,18 +286,20 @@ class DataManager(MuxBuffer):
 
     def reset(self):
         """Reset DAQ manager, clear all data and graphs."""
-        self.source.reset()
+        self.source.paused = True
         self.reset_signal.emit()
+        self.source.reset()
+        self.source.paused = False
 
     def pause_toggle(self):
         """Pauses the DAQ manager."""
         # Virtual DAQ needs a dataset loaded before running
         if self.source is not self.virt_daq or self.virt_daq.ds is not None:
-            if self.paused is True:
+            if self.source.paused is True:
                 # self.reset()  # used for arbitrary dt
-                self.paused = False
+                self.source.paused = False
             else:
-                self.paused = True
+                self.source.paused = True
 
     def close(self):
         """Close the selected object in the DAQ manager."""

@@ -133,7 +133,6 @@ class FftWidget(pg.GraphicsLayoutWidget):
         # self.update_fps()
 
     def reset(self):
-        self.radar.reset()
         self.vmax_data = []
         # When paused, redraw after reset
         if self.data_mgr.paused:

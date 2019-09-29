@@ -24,11 +24,13 @@ import numpy as np
 from pyqtgraph import QtCore
 from pyratk.datatypes.ts_data import TimeSeries
 
+from formatting import warning
+
 
 class DAQ(QtCore.QThread):
     # Create event for processing new data only when available
     data_available_signal = QtCore.pyqtSignal(tuple)
-    reset_signal = QtCore.pyqtSignal()
+    reset_signal = QtCore.pyqtSignal()  # required for VirtualDAQ
 
     def __init__(self, daq_type="NI-DAQ",
                  sample_rate=44100, sample_chunk_size=4096,
@@ -53,7 +55,7 @@ class DAQ(QtCore.QThread):
         self.sample_chunk_size = sample_chunk_size
         self.update_period = sample_chunk_size / sample_rate
         self.daq_type = daq_type
-        self.paused = False  # Start running by default
+        self.paused = True
 
         self.sample_num = 0
 
@@ -115,6 +117,7 @@ class DAQ(QtCore.QThread):
         """Call get_samples forever."""
         while self.running:
             if self.paused:
+                warning('(daq.py) daq paused...')
                 time.sleep(0.1)  # sleep 100 ms
             else:
                 self.get_samples()
