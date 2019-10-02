@@ -24,7 +24,7 @@ import numpy as np
 from pyqtgraph import QtCore
 from pyratk.datatypes.ts_data import TimeSeries
 
-from formatting import warning
+from pyratk.formatting import warning
 
 
 class DAQ(QtCore.QThread):
@@ -117,7 +117,7 @@ class DAQ(QtCore.QThread):
         """Call get_samples forever."""
         while self.running:
             if self.paused:
-                warning('(daq.py) daq paused...')
+                # warning('(daq.py) daq paused...')
                 time.sleep(0.1)  # sleep 100 ms
             else:
                 self.get_samples()
@@ -172,7 +172,7 @@ class DAQ(QtCore.QThread):
             if not self.t_sampling.is_alive():
                 print('Staring sampling thread')
                 self.t_sampling.start()
-            self.paused = False
+            # self.paused = False
         except RuntimeError as e:
             print('Error starting sampling thread: ', e)
 

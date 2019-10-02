@@ -8,7 +8,7 @@ Author: Jason Merlo
 """
 
 from pyqtgraph import QtCore
-from formatting import warning
+from pyratk.formatting import warning
 
 class MuxBuffer(QtCore.QObject):
     """
@@ -42,7 +42,7 @@ class MuxBuffer(QtCore.QObject):
             self.add_source(source)
         self.source = source
 
-        warning(self.source_list)
+        # warning(self.source_list)
 
     def get_source(self):
         return self.source

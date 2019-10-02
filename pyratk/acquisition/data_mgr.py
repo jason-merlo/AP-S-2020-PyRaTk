@@ -91,6 +91,16 @@ class DataManager(MuxBuffer):
             # Handle all other exceptions
             print(e)
 
+        # Create ground truth data group
+        try:
+            self.trajectories = self.db["trajectories"]
+        except KeyError:
+            print("No 'trajectories' group found. Creating 'trajectories'...")
+            self.trajectories = self.db.create_group("trajectories")
+        except Exception as e:
+            # Handle all other exceptions
+            print(e)
+
         try:
             self.labels = self.db["labels"]
         except KeyError:
@@ -115,6 +125,15 @@ class DataManager(MuxBuffer):
         """Load dataset into virtualDAQ and set to virtualDAQ source."""
         # self.reset()
         self.virt_daq.load_dataset(ds)
+
+        # load trajectory if available
+        if 'trajectory' in ds.attrs.keys():
+            self.trajectory_label = ds.attrs['trajectory'].decode('utf-8')
+
+            # Open trajectory dataset
+            ts = self.trajectories[ds.name.split('/')[-1]]
+            self.virt_daq.load_trajectory(ts)
+
         self.set_source(self.virt_daq)
         self.reset()
 
@@ -128,8 +147,29 @@ class DataManager(MuxBuffer):
         else:
             print("(DataManager) Database must be loaded before datasets read")
 
+    def get_database(self):
+        """Return the database object."""
+        return self.db
+
     def delete_dataset(self, ds):
         """Remove dataset from database."""
+        try:
+            del self.db[ds.name]
+        except Exception as e:
+            print("Error deleting dataset: ", e)
+
+    def get_trajectories(self):
+        """Return list of all dataset objects in 'trajectories' dataset."""
+        keys = []
+        if self.db:
+            for key in self.trajectories:
+                keys.append(self.trajectories[key])
+            return keys
+        else:
+            print("(DataManager) Database must be loaded before datasets read")
+
+    def delete_trajectory(self, ds):
+        """Remove trajectory from database."""
         try:
             del self.db[ds.name]
         except Exception as e:
@@ -141,6 +181,8 @@ class DataManager(MuxBuffer):
 
         If no name is provided, 'sample_n' will be used, where n is the index
         of the sample relative to 0.
+
+        Will save trajectory_samples as ground truth if it exists.
         """
         if "/samples/{:}".format(name) in self.db:
             ds = self.samples[name]
@@ -154,6 +196,23 @@ class DataManager(MuxBuffer):
                     compression_opts=COMPRESSION_OPTS)
             except Exception as e:
                 print("(DataManager) Error saving dataset: ", e)
+
+        # Create ground truth data if available
+        if hasattr(self.source, 'trajectory_samples'):
+            if "/trajectories/{:}".format(name) in self.db:
+                trajectory_ds = self.trajectories[name]
+            else:
+                # Does not exist, create new entry
+                try:
+                    # Save buffer data
+                    trajectory_ds = self.trajectories.create_dataset(
+                        name, data=self.source.trajectory_samples,
+                        compression=COMPRESSION,
+                        compression_opts=COMPRESSION_OPTS)
+                    attrs = self.trajectories[name].attrs
+                    attrs.create("coordinate_type", self.source.coordinate_type.encode('utf-8'))
+                except Exception as e:
+                    print("(DataManager) Error saving trajectory: ", e)
 
         # Create hard links to class label group and subject group
         if labels is None:
@@ -192,6 +251,7 @@ class DataManager(MuxBuffer):
             attrs.create("daq_type", self.source.daq_type.encode('utf8'))
             attrs.create("num_channels", self.source.num_channels)
             attrs.create("label", labels_str.encode('utf8'))
+            attrs.create("trajectory", name.encode('utf8'))
             if subject:
                 if type(subject) is str:
                     subject_name = subject
@@ -287,9 +347,9 @@ class DataManager(MuxBuffer):
     def reset(self):
         """Reset DAQ manager, clear all data and graphs."""
         self.source.paused = True
-        self.reset_signal.emit()
         self.source.reset()
-        self.source.paused = False
+        self.reset_signal.emit()
+        # self.source.paused = False
 
     def pause_toggle(self):
         """Pauses the DAQ manager."""
