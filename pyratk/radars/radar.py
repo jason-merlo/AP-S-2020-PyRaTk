@@ -17,7 +17,7 @@ from pyratk.datatypes.geometry import Point         # radar location
 # from pyratk.datatypes.motion import StateMatrix   # track location
 from pyqtgraph import QtCore
 
-from formatting import warning
+from pyratk.formatting import warning
 
 
 # CONSTANTS
