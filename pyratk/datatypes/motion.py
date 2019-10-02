@@ -23,8 +23,9 @@ class StateMatrix(object):
         # TODO: Add row_major axis type
         # Check coordinate type
         if coordinate_type not in self.coordinate_types.keys():
-            raise ValueError("Coordinate type must be one of the following:",
-                             self.valid_coordinate_types)
+            raise ValueError(
+                "Coordinate type must be one of the following: {:}"
+                .format(', '.join(self.coordinate_types.keys())))
 
         self.coordinate_type = coordinate_type
 
@@ -58,7 +59,7 @@ class StateMatrix(object):
         elif self.coordinate_type == 'spherical':
             coord_list = self.coordinate_types['spherical']
 
-        ret_str = '\n' + ' '*6 + ' {:^9} {:^9} {:^9}'.format(*coord_list)
+        ret_str = '\n' + ' ' * 6 + ' {:^9} {:^9} {:^9}'.format(*coord_list)
 
         # loop through all indexes in each state vector
         derivative_list = ('pos', 'vel', 'acc')
@@ -81,36 +82,36 @@ class StateMatrix(object):
         """
         if coordinate_type == self.coordinate_type and origin == Point():
             # If no change is needed, return self state matrix
-            return_matrix = self.q.copy()
+            return_matrix=self.q.copy()
 
         elif coordinate_type == 'cartesian':
             # First convert to cartesian
             if self.coordinate_type == 'cartesian':
-                return_matrix = self.q.copy()
+                return_matrix=self.q.copy()
             elif self.coordinate_type == 'cylindrical':
-                return_matrix = np.empty(self.q.shape)
+                return_matrix=np.empty(self.q.shape)
 
                 # State vectors
-                rho = self.q[0]
-                phi = self.q[1]
-                z = self.q[2]
+                rho=self.q[0]
+                phi=self.q[1]
+                z=self.q[2]
 
                 # Zeroth derivative
-                return_matrix[:, 0] = np.array([
+                return_matrix[:, 0]=np.array([
                     rho[0] * np.cos(phi[0]),
                     rho[0] * np.sin(phi[0]),
                     z[0]
                 ])
 
                 # First derivative
-                return_matrix[:, 1] = np.array([
+                return_matrix[:, 1]=np.array([
                     rho[1] * np.cos(phi[0]) - rho[0] * phi[1] * np.sin(phi[0]),
                     rho[1] * np.sin(phi[0]) + rho[0] * phi[1] * np.cos(phi[0]),
                     z[1]
                 ])
 
                 # Second derivative
-                return_matrix[:, 2] = np.array([
+                return_matrix[:, 2]=np.array([
                     - phi[1]**2 * rho[0] * np.cos(phi[0])
                     - 2 * phi[1] * rho[1] * np.sin(phi[0])
                     - phi[2] * rho[0] * np.sin(phi[0])
@@ -132,32 +133,32 @@ class StateMatrix(object):
 
         elif coordinate_type == 'cylindrical':
             # Relative point (rp), corrected for origin location
-            rp = self.get_state('cartesian', origin)
+            rp=self.get_state('cartesian', origin)
 
             # Radius axis (Rho)
-            rho = np.empty(rp.shape[1])
-            rho[0] = np.sqrt(rp[0][0]**2 + rp[1][0]**2)
-            rho[1] = (rp[0][0] * rp[0][1] + rp[1][0] * rp[1][1]) / rho[0]
+            rho=np.empty(rp.shape[1])
+            rho[0]=np.sqrt(rp[0][0]**2 + rp[1][0]**2)
+            rho[1]=(rp[0][0] * rp[0][1] + rp[1][0] * rp[1][1]) / rho[0]
             # TODO: Add acceleration
-            rho[2] = 0
+            rho[2]=0
 
             # Azimuth axis (Phi)
-            phi = np.empty(rp.shape[1])
-            phi[0] = np.arctan2(rp[1][0], rp[0][0])
-            phi[1] = (rp[0][0] - rp[1][0]) / (rp[0][0]**2 + rp[1][0]**2)
+            phi=np.empty(rp.shape[1])
+            phi[0]=np.arctan2(rp[1][0], rp[0][0])
+            phi[1]=(rp[0][0] - rp[1][0]) / (rp[0][0]**2 + rp[1][0]**2)
             # TODO: Add acceleration
-            phi[2] = 0
+            phi[2]=0
 
-            return_matrix = np.array((rho, phi, rp[2][0]))
+            return_matrix=np.array((rho, phi, rp[2][0]))
 
         elif coordinate_type == 'spherical':
             # Relative point (rp), corrected for origin location
-            rp = self.get_state('cartesian', origin)
+            rp=self.get_state('cartesian', origin)
 
             # Radius axis (Rho)
-            rho = np.empty(rp.shape[1])
-            rho[0] = np.sqrt(np.sum(rp[:, 0]**2))
-            rho[1] = (rp[0][0] * rp[0][1]
+            rho=np.empty(rp.shape[1])
+            rho[0]=np.sqrt(np.sum(rp[:, 0]**2))
+            rho[1]=(rp[0][0] * rp[0][1]
                       + rp[1][0] * rp[1][1]
                       + rp[2][0] * rp[2][1]) / rho[0]
             # TODO: Add acceleration
