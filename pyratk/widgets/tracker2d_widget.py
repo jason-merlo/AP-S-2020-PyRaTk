@@ -14,12 +14,13 @@ from pyratk.datatypes.geometry import Point, Circle
 
 
 class Tracker2dWidget(pg.GraphicsLayoutWidget):
-    def __init__(self, tracker, xRange=[-0.10, 0.10], yRange=[-0.10, 0.10],
-                 trail=1):
+    def __init__(self, tracker, data_mgr, xRange=[-0.10, 0.10],
+                 yRange=[-0.10, 0.10], trail=1):
         super(Tracker2dWidget, self).__init__()
 
         # Copy arguments to member variables
         self.tracker = tracker
+        self.data_mgr = data_mgr
         self.xRange = xRange
         self.yRange = yRange
         self.trail = trail
@@ -58,7 +59,14 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
 
         # Set up plot
         self.plot.setRange(xRange=self.xRange, yRange=self.yRange)
-        self.pw = self.plot.plot()
+
+        self.pw_track = self.plot.plot()
+        self.circle_track = pg.PlotCurveItem()
+        self.plot.addItem(self.circle_track)
+
+        self.pw_trajectory = self.plot.plot()
+        self.circle_trajectory = pg.PlotCurveItem()
+        self.plot.addItem(self.circle_trajectory)
         self.plot.setLabel('left', text='Distance-Y', units='m')
         self.plot.setLabel('bottom', text='Distance-X', units='m')
         self.plot.setTitle('Tracker2D')
@@ -72,10 +80,24 @@ class Tracker2dWidget(pg.GraphicsLayoutWidget):
         '''
         Draws track trail and radar circles on tracker2d graph
         '''
-        # === Draw trace line =========
+        # === Draw track line =========
         data = self.tracker.ts_location.data[-self.trail:, :, 0]
         data = np.array([(p[0], p[1]) for p in data])
-        self.pw.setData(data, pen=pg.mkPen({'color': "FFF", 'width': 2}))
+        track_pen = pg.mkPen({'color': "FFF", 'width': 2})
+        self.pw_track.setData(data, pen=track_pen)
+
+        pt = Point(*data[-1])
+        self.draw_circle(self.circle_track, Circle(pt, 0.001), color="FFF")
+
+        # === Draw ground truth trajectory line =========
+        if hasattr(self.data_mgr.source, 'ts_trajectory'):
+            data = self.data_mgr.source.ts_trajectory.data[-self.trail:]
+            data = np.array([(p[0][0], p[1][0]) for p in data])
+            trajectory_pen = pg.mkPen({'color': "FF0A", 'width': 2})
+            self.pw_trajectory.setData(data, pen=trajectory_pen)
+
+            pt = Point(*data[-1])
+            self.draw_circle(self.circle_trajectory, Circle(pt, 0.001), color="FF0A")
 
         # === Draw tracker triangle ===
         # triangle_x = [p.x for p in self.tracker.best_triangle.points]
