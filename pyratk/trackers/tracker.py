@@ -13,13 +13,6 @@ from pyratk.datatypes.geometry import Point
 # DEBUG
 USE_LPF = True
 
-RED   = "\033[1;31m"
-BLUE  = "\033[1;34m"
-CYAN  = "\033[1;36m"
-GREEN = "\033[0;32m"
-RESET = "\033[0;0m"
-BOLD    = "\033[;1m"
-
 class Tracker2D(object):
     """Class to track detections using 4 doppler measurements."""
 
@@ -125,7 +118,7 @@ class Tracker2D(object):
 
             # Assign vector length to measured Doppler velocity
             dr = r_hat * radar.drho / np.sin(phi)
-            print("dr:\t", dr)
+            # print("dr:\t", dr)
 
             # Add radar measurement vector to average
             average_velocity_vector += dr
@@ -136,7 +129,7 @@ class Tracker2D(object):
         self.location.q[:, 1] = average_velocity_vector
         self.location.q[:, 0] += self.location.q[:, 1] * self.data_mgr.source.update_period
 
-        print('(tracker.py) v_bar:\t', self.location.q[:, 1])
+        # print('(tracker.py) v_bar:\t', self.location.q[:, 1])
         # print(self.location)
 
     # ====== CONTROL METHODS ================================================= #
@@ -153,7 +146,7 @@ class Tracker2D(object):
         # Add state matrix to TimeSeries
         self.ts_location.append(self.location.q)
 
-        print("(tracker.py) initial_location: \n", self.ts_location[0])
+        # print("(tracker.py) initial_location: \n", self.ts_location[0])
 
     def reset(self):
         """Reset all temporal elements."""
