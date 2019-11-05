@@ -12,6 +12,7 @@ from pyratk.acquisition.mux_buffer import MuxBuffer
 from pyratk.acquisition.virtual_daq import VirtualDAQ
 from pyratk.acquisition import daq   # Extention of DAQ object
 from pyqtgraph import QtCore
+from pyratk.formatting import warning
 
 
 # COMPRESSION OPTIONS
@@ -131,8 +132,11 @@ class DataManager(MuxBuffer):
             self.trajectory_label = ds.attrs['trajectory'].decode('utf-8')
 
             # Open trajectory dataset
-            ts = self.trajectories[ds.name.split('/')[-1]]
-            self.virt_daq.load_trajectory(ts)
+            try:
+                ts = self.trajectories[ds.name.split('/')[-1]]
+                self.virt_daq.load_trajectory(ts)
+            except KeyError as e:
+                warning('Error loading ground-truth trajectory: {:}'.format(e))
 
         self.set_source(self.virt_daq)
         self.reset()
@@ -251,7 +255,8 @@ class DataManager(MuxBuffer):
             attrs.create("daq_type", self.source.daq_type.encode('utf8'))
             attrs.create("num_channels", self.source.num_channels)
             attrs.create("label", labels_str.encode('utf8'))
-            attrs.create("trajectory", name.encode('utf8'))
+            if hasattr(self.source, 'trajectory_samples'):
+                attrs.create("trajectory", name.encode('utf8'))
             if subject:
                 if type(subject) is str:
                     subject_name = subject
