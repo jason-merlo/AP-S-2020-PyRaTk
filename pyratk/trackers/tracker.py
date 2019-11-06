@@ -57,7 +57,7 @@ class Tracker2D(object):
         self.data_mgr = data_mgr
         self.radar_array = radar_array
         self.start_loc = start_loc.q.copy()
-        self.location = StateMatrix(self.start_loc.copy())
+        self.state = StateMatrix(self.start_loc.copy())
 
         init_track_length = 4096
         self.ts_location = TimeSeries(init_track_length,
@@ -65,7 +65,7 @@ class Tracker2D(object):
                                       dtype=np.float64)
 
         # append initial location
-        self.ts_location.append(self.location.q)
+        self.ts_location.append(self.state.q)
 
         # Configure control signals
         self.connect_control_signals()
@@ -102,9 +102,14 @@ class Tracker2D(object):
         """
         average_velocity_vector = Point()
 
+        # Compute intersecting perpendicular lines - Y = Ax + B
+        Y = []
+        A = []
+        B = []
+
         for radar in self.radar_array:
             # Compute unit vector from radar towards the target
-            rho = Point(*self.location[:, 0]) - radar.loc
+            rho = Point(*self.state.q[:, 0]) - radar.loc
             r = Point(rho[0], rho[1])  # Project onto x-y plane
             r_hat = r.copy()
             r_hat.normalize()
@@ -126,11 +131,11 @@ class Tracker2D(object):
         average_velocity_vector /= len(self.radar_array)
 
         # Update state matrix based on fused data
-        self.location.q[:, 1] = average_velocity_vector
-        self.location.q[:, 0] += self.location.q[:, 1] * self.data_mgr.source.update_period
+        self.state.q[:, 1] = average_velocity_vector
+        self.state.q[:, 0] += self.state.q[:, 1] * self.data_mgr.source.update_period
 
-        # print('(tracker.py) v_bar:\t', self.location.q[:, 1])
-        # print(self.location)
+        # print('(tracker.py) v_bar:\t', self.state.q[:, 1])
+        # print(self.state)
 
     # ====== CONTROL METHODS ================================================= #
     def update(self):
@@ -144,16 +149,16 @@ class Tracker2D(object):
         self.update_fused_state_estimate()
 
         # Add state matrix to TimeSeries
-        self.ts_location.append(self.location.q)
+        self.ts_location.append(self.state.q)
 
         # print("(tracker.py) initial_location: \n", self.ts_location[0])
 
     def reset(self):
         """Reset all temporal elements."""
         print("(tracker.py) Resetting tracker...", self.start_loc.copy())
-        self.location.q = self.start_loc.copy()
+        self.state.q = self.start_loc.copy()
         self.ts_location.clear()
-        self.ts_location.append(self.location.q)
+        self.ts_location.append(self.state.q)
 
 # class TrackerEvaluator(Object):
 #     def __init__():

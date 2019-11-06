@@ -90,14 +90,7 @@ class VirtualDAQ(daq.DAQ):
                 print("Invalid sample index:", self.sample_index)
 
             if self.ts:
-                try:
-                    coordinate_type = self.ts.attrs['coordinate_type'].decode('utf-8')
-                    data = StateMatrix(self.ts[..., self.sample_index * self.sample_chunk_size],
-                                       coordinate_type=coordinate_type)
-                    self.trajectory_data = data.get_state().q
-                    # print(self.trajectory_data)
-                except IndexError:
-                    print("Invalid trajectory sample index:", self.sample_index)
+                self._append_trajectory(self.sample_index)
 
             # Delay by sample period
             if loop == -1 or loop == 1:
@@ -124,7 +117,7 @@ class VirtualDAQ(daq.DAQ):
                 self.sample_index = 0
                 if self.ts:
                     self.ts_trajectory.clear()
-                    self.ts_trajectory.append(self.ts[..., 0])
+                    self._append_trajectory(self.sample_index)
                 self.reset_signal.emit()
 
             # Return True if more data
@@ -133,11 +126,23 @@ class VirtualDAQ(daq.DAQ):
             raise RuntimeError(
                 "(VirtualDAQ) Dataset source must be set to get samples")
 
+    def _append_trajectory(self, index):
+        coordinate_type = self.ts.attrs['coordinate_type'].decode('utf-8')
+
+        try:
+            data = StateMatrix(self.ts[..., self.sample_index * self.sample_chunk_size],
+                               coordinate_type=coordinate_type)
+        except IndexError:
+            print("Invalid trajectory sample index:", self.sample_index)
+
+        self.trajectory_data = data.get_state().q
+        self.ts_trajectory.append(self.trajectory_data)
+
     def reset(self):
         """Reset all data to beginning of data file and begin playing."""
         self.close()
         if self.ts:
             self.ts_trajectory.clear()
-            self.ts_trajectory.append(self.ts[..., 0])
+            self._append_trajectory(self.sample_index)
         self.sample_index = 0
         self.run()
