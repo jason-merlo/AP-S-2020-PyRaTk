@@ -51,7 +51,8 @@ class SynthDAQ(daq.DAQ):
         """
         super().__init__()
         # DAQ Attributes
-        self.sample_rate = daq['sample_rate']
+        self.sample_interval = daq['sample_interval']
+        self.sample_rate = 1.0/daq['sample_interval']
         self.sample_chunk_size = daq['sample_size']
         self.daq_type = 'SynthDAQ'
         self.num_channels = 2 * len(array['radar_list'])
@@ -422,7 +423,7 @@ class SynthDAQ(daq.DAQ):
         logging.debug('num_samples: {:}'.format(num_sample_chunks))
 
         # Allocate doppler sample array
-        doppler_samples_size = (self.num_channels // 2,
+        doppler_samples_size = (self.num_channels // 2, 2,
                                 self.trajectory_samples.shape[-1])
         doppler_samples = np.empty(doppler_samples_size, dtype=np.float64)
 
@@ -437,18 +438,7 @@ class SynthDAQ(daq.DAQ):
         radar_samples_size = (self.num_channels, doppler_samples.shape[-1])
         radar_samples = np.empty(radar_samples_size, dtype=np.float64)
 
-        # Compute radar responses
-        start_time = 0
-        end_time = doppler_samples.shape[-1] // self.sample_rate
-        num_samples = doppler_samples.shape[-1]
-        time = np.linspace(start_time, end_time, num_samples)
-
-        # Not sure where 31167 comes from, but it seems to scale linearly
-        radar_freq_response = np.cumsum(doppler_samples / 31167, axis=-1)
-        # radar_freq_response = doppler_samples * time
-        tmp_radar_samples = np.array([np.cos(radar_freq_response),
-                                      np.sin(radar_freq_response)])
-        radar_samples = np.reshape(tmp_radar_samples, radar_samples_size, order='F')
+        radar_samples = np.reshape(doppler_samples, radar_samples_size, order='F')
 
         # plt.subplot(311)
         # plt.title('doppler_samples')
@@ -492,7 +482,7 @@ class SynthDAQ(daq.DAQ):
 
         """
         # Allocate space for samples
-        doppler_sample_chunk = np.empty((trajectory_sample.shape[2],))
+        doppler_sample_chunk = np.empty((trajectory_sample.shape[-1],2))
 
         # Get constants for conversion
         c = spc.speed_of_light
@@ -507,14 +497,23 @@ class SynthDAQ(daq.DAQ):
             sample_rad = sample.get_state(coordinate_type='spherical',
                                           origin=Point(*radar_dict['location']))
 
-            # Compute doppler frequency
-            rho_dot = sample_rad[0, 1]
-            wavelength = c / f0
-            doppler_freq = rho_dot * 2 / wavelength * 2 * np.pi
+            # Compute phase/amplitude of the signal
+            rho = sample_rad[0, 0]
+            # Time delay of signal
+            tau = (rho / c)
+            sample_interval = self.sample_interval
 
-            doppler_sample_chunk[idx] = doppler_freq  # + AWGN()
+            output_i = np.cos(2 * np.pi * f0 * (sample_interval * idx - tau))
+            output_q = np.sin(2 * np.pi * f0 * (sample_interval * idx - tau))
 
-        return doppler_sample_chunk
+            # doppler_sample_chunk[idx] = doppler_freq  # + AWGN()
+            doppler_sample_chunk[idx] = np.array((output_i, output_q))
+            # if idx % 1000 == 0:
+            #     print('rho:', rho)
+            #     print('tau:', tau)
+            #     print('sample:', doppler_sample_chunk[idx])
+
+        return doppler_sample_chunk.transpose()
 
     def get_samples(self):
         """
