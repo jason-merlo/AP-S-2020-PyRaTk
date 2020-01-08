@@ -13,6 +13,8 @@ from pyratk.acquisition.virtual_daq import VirtualDAQ
 from pyratk.acquisition import daq   # Extention of DAQ object
 from pyqtgraph import QtCore
 from pyratk.formatting import warning
+import numpy as np
+import datetime
 
 
 # COMPRESSION OPTIONS
@@ -188,6 +190,7 @@ class DataManager(MuxBuffer):
 
         Will save trajectory_samples as ground truth if it exists.
         """
+
         if "/samples/{:}".format(name) in self.db:
             ds = self.samples[name]
         else:
@@ -214,7 +217,8 @@ class DataManager(MuxBuffer):
                         compression=COMPRESSION,
                         compression_opts=COMPRESSION_OPTS)
                     attrs = self.trajectories[name].attrs
-                    attrs.create("coordinate_type", self.source.coordinate_type.encode('utf-8'))
+                    attrs.create("coordinate_type",
+                        self.source.coordinate_type.encode('utf-8'))
                 except Exception as e:
                     print("(DataManager) Error saving trajectory: ", e)
 
@@ -229,6 +233,11 @@ class DataManager(MuxBuffer):
                     label_name = label
                 else:
                     label_name = label.name
+
+                if label_name not in self.labels:
+                    print('Adding label:', label_name)
+                    self.add_label(label_name)
+
                 # print('Checking if',
                 #       "labels/{:}/{:}".format(label_name, name), 'exists')
                 if "{:}/{:}".format(label_name, name) not in self.labels:
@@ -241,6 +250,16 @@ class DataManager(MuxBuffer):
                 subject_name = subject
             else:
                 subject_name = subject.name
+
+            print('Subjects:\n'+'-'*80)
+            for t_subject in self.subjects:
+                print(t_subject)
+            print('-'*80)
+
+            if subject_name not in self.subjects:
+                print('Adding subject:', subject_name)
+                self.add_subject(subject_name)
+
             if "{:}/{:}".format(subject_name, name) not in self.subjects:
                 self.subjects[subject_name][name] = ds
 
@@ -267,6 +286,89 @@ class DataManager(MuxBuffer):
             attrs.create("notes", notes.encode('utf8'))
         except Exception as e:
             print("(DataManager) Error saving attributes: ", e)
+
+    def save_csv(self, name):
+        """
+        Write buffer contents to csv with specified 'name'.
+
+        If no name is provided, 'sample_n' will be used, where n is the index
+        of the sample relative to 0.
+
+        Will save trajectory_samples as ground truth if it exists.
+        """
+
+        # Reshape array to hold contiguous samples, not chunks
+        data = self.source.ts_buffer.data
+
+        print('data.shape', data.shape)
+
+        chunk_size = data.shape[2]
+        num_chunks = data.shape[0]
+        num_channels = data.shape[1]
+
+        new_shape = (num_channels, num_chunks * chunk_size)
+        new_data = np.empty(new_shape)
+
+        print('new_data.shape', new_data.shape)
+
+        for chunk_idx in range(num_chunks):
+            start_idx = chunk_size * chunk_idx
+            end_idx = start_idx + chunk_size
+            new_data[:, start_idx:end_idx] = data[chunk_idx, :, :]
+
+        # Transpose to be column vectors
+        new_data = new_data.transpose()
+
+        # Add timestamp data per sample (to match NI readout)
+        start = 0
+        step = self.source.sample_interval
+        stop = new_data.shape[0] * step
+        sample_times = np.array([np.arange(start, stop, step)]).transpose()
+        print(sample_times.shape)
+
+        new_data = np.insert(new_data, [i for i in range(num_channels)],
+                             sample_times, axis=1)
+
+        # Prepend header info
+        now = datetime.datetime.now()
+        date_str = now.strftime("%m/%d/%Y %I:%M:%S %p")
+        header = []
+
+        header_1 = ('Timestamp', date_str) * num_channels
+        header.append(','.join(header_1))
+
+        header_2 = ('Interval', str(self.source.sample_interval))\
+                    * num_channels
+        header.append(','.join(header_2))
+
+        header_3 = []
+        for i in range(num_channels):
+            header_3.append('Channel name')
+            header_3.append('"Input {:d}"'.format(i))
+        header.append(','.join(header_3))
+
+        header_4 = ('Unit','"V"') * num_channels
+        header.append(','.join(header_4))
+
+        header = '\n'.join(header)
+
+        # Does not exist, create new entry
+        try:
+            samples_name = '{}.csv'.format(name)
+            np.savetxt(samples_name, new_data,
+                       header=header, fmt='%g', delimiter=',', comments='')
+        except Exception as e:
+            print("(DataManager) Error saving csv: ", e)
+
+
+        # Create ground truth data if available
+        # if hasattr(self.source, 'trajectory_samples'):
+        #     try:
+        #         trajectory_name = '{}_trajectory.csv'.format(name)
+        #         np.savetxt(trajectory_name, self.source.trajectory_samples,
+        #           delimiter=',')
+        #     except Exception as e:
+        #         print("(DataManager) Error saving trajectory: ", e)
 
     def remove_attributes(self, name, labels, subject):
         """
