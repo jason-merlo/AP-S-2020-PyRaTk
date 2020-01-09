@@ -488,6 +488,22 @@ class SynthDAQ(daq.DAQ):
         c = spc.speed_of_light
         f0 = radar_dict['frequency']
 
+        # If no antenna cos power provided, model with cosine of power 1
+        if 'antenna_cos_power' in radar_dict:
+            antenna_cos_power = radar_dict['antenna_cos_power']
+        else:
+            antenna_cos_power = 1.0
+
+        if 'prf' in radar_dict:
+            prf = radar_dict['prf']
+        else:
+            prf = 1.0
+
+        if 'pw' in radar_dict:
+            pw = radar_dict['pw']
+        else:
+            pw = 1.0
+
         # Loop over all 3x3 StateMatrix's in the sample chunk
         for idx in range(trajectory_sample.shape[-1]):
             sample = StateMatrix(trajectory_sample[..., idx],
@@ -499,15 +515,25 @@ class SynthDAQ(daq.DAQ):
 
             # Compute phase/amplitude of the signal
             rho = sample_rad[0, 0]
+            theta = sample_rad[2, 0]
             # Time delay of signal
             tau = (rho / c)
             sample_interval = self.sample_interval
+            time = sample_interval * idx
 
-            output_i = np.cos(2 * np.pi * f0 * (sample_interval * idx - tau))
-            output_q = np.sin(2 * np.pi * f0 * (sample_interval * idx - tau))
+            if (time - tau) % (1.0/prf) < pw:
+                output_i = np.cos(2 * np.pi * f0 * (time - tau))\
+                            # + np.random.normal(0, 1.0)
+                output_q = np.sin(2 * np.pi * f0 * (time - tau))\
+                            # + np.random.normal(0, 1.0)
 
-            # doppler_sample_chunk[idx] = doppler_freq  # + AWGN()
-            doppler_sample_chunk[idx] = np.array((output_i, output_q))
+                iq_sample = np.array((output_i, output_q))\
+                            * np.cos(theta)**antenna_cos_power\
+                            # * theta**(1/5)
+            else:
+                iq_sample = np.array((0, 0))
+
+            doppler_sample_chunk[idx] = iq_sample
             # if idx % 1000 == 0:
             #     print('rho:', rho)
             #     print('tau:', tau)

@@ -300,16 +300,12 @@ class DataManager(MuxBuffer):
         # Reshape array to hold contiguous samples, not chunks
         data = self.source.ts_buffer.data
 
-        print('data.shape', data.shape)
-
         chunk_size = data.shape[2]
         num_chunks = data.shape[0]
         num_channels = data.shape[1]
 
         new_shape = (num_channels, num_chunks * chunk_size)
         new_data = np.empty(new_shape)
-
-        print('new_data.shape', new_data.shape)
 
         for chunk_idx in range(num_chunks):
             start_idx = chunk_size * chunk_idx
@@ -324,7 +320,6 @@ class DataManager(MuxBuffer):
         step = self.source.sample_interval
         stop = new_data.shape[0] * step
         sample_times = np.array([np.arange(start, stop, step)]).transpose()
-        print(sample_times.shape)
 
         new_data = np.insert(new_data, [i for i in range(num_channels)],
                              sample_times, axis=1)
