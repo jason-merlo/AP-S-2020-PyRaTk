@@ -122,6 +122,8 @@ class StateMatrix(object):
                     + rho[2] * np.sin(phi[0]),
                     z[2]
                 ])
+            # elif coordinate_type == 'spherical':
+            #     pass
 
             else:
                 raise RuntimeError("'{}' is an unsupported coordinate type to "

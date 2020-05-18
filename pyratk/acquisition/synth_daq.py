@@ -12,13 +12,16 @@ import threading                     # Asynchronous operation of DAQ
 # import time                          # Sleeping DAQ sample thread
 
 import matplotlib.pyplot as plt      # Graphing trajectory
-
 import scipy.constants as spc        # speed of light
+# import multiprocess as mp
+from multiprocess import Pool
+# from pathos.multiprocessing import ProcessingPool as Pool
 
 from pyratk.acquisition import daq   # Base DAQ class
 from pyratk.datatypes.motion import StateMatrix  # Tracking state
 from pyratk.datatypes.ts_data import TimeSeries  # Storing time-series data
 from pyratk.datatypes.geometry import Point      # Coodinate systems
+
 
 # Configure logging options
 logging.basicConfig(level=logging.DEBUG,
@@ -33,9 +36,6 @@ class SynthDAQ(daq.DAQ):
         'cylindrical': ('r', 'theta', 'z'),
         'spherical': ('rho', 'theta', 'phi')
     }
-
-    # List of supported radar types
-    radar_types = ('doppler')
 
     def __init__(self, daq, array):
         """Create SynthDAQ to generate synthetic data.
@@ -52,13 +52,13 @@ class SynthDAQ(daq.DAQ):
         super().__init__()
         # DAQ Attributes
         self.sample_interval = daq['sample_interval']
-        self.sample_rate = 1.0/daq['sample_interval']
+        self.sample_rate = 1.0 / daq['sample_interval']
         self.sample_chunk_size = daq['sample_size']
         self.daq_type = 'SynthDAQ'
         self.num_channels = 2 * len(array['radar_list'])
 
         # Array Attributes
-        self.array = array
+        self.array = array['radar_list']
 
         # start paused if no dataset is selected
         self.paused = True
@@ -137,15 +137,25 @@ class SynthDAQ(daq.DAQ):
             q_max = StateMatrix(np.array(wp)[:, :, 1])
             self.waypoints.append({'q': q, 'q_max': q_max})
 
+    def generate_trajectory_function(self):
+        """
+        Compute trajectory function coefficients.
+
+        Pre-compute trajectory funciton coefficiets to allow for arbitrary
+        time sampling of target state(s) at a given time.
+        """
+        pass
+
     def generate_trajectory_samples(self):
         """
         Pre-compute trajectory and sample location.
 
-        TODO: Break into smaller functions to reduce cyclonomic complexity.
-
         Create array of StateMatrix at locations derived from DAQ sampling
         period using Linear Segments with Parabolic Blends (LSPB).
         """
+        # TODO: Do not pre-compute; causes issues for modulated waveforms
+        # TODO: Break into smaller functions to reduce cyclonomic complexity.
+
         # Check if trajectory file has been loaded
         if self.waypoints == []:
             raise RuntimeError("Trajectory description file required to "
@@ -153,8 +163,8 @@ class SynthDAQ(daq.DAQ):
                                "load_trajectory() first.")
 
         # Calculate sample period
-        logging.debug('sample_rate: {:+6.3} (Hz)'.
-                      format(1 / self.sample_chunk_period))
+        logging.debug('sample_rate: {:+6.3f} (Hz)'.
+                      format(1.0 / self.sample_interval))
 
         # Iterate through each pair of waypoints to calculate trajectory
         wp1 = None
@@ -384,26 +394,90 @@ class SynthDAQ(daq.DAQ):
             # Incriment waypoints
             wp1 = wp2
 
-    def plot_trajectory(self):
+    def trajectory_to_csv(self):
+        fp = open('trajectory.csv', 'w')
+
+        time = np.array(list(range(self.trajectory_samples[0][0].shape[0]))) / self.sample_rate
+        for t_idx, t in enumerate(time):
+            fp.write(str(t) + ',')
+            for i in range(3):
+                for j in range(3):
+                    val = (self.trajectory_samples[j][i][t_idx])
+                    fp.write(str(val) + ',')
+            fp.write('\n')
+        fp.close()
+
+    def plot_trajectory(self, publish=True):
         """Plot 3D trajectory on a 2D graph."""
-        fig = plt.figure(figsize=(14, 10))
-        fig.suptitle('Target Position vs. Time', fontsize=16)
-        for i in range(3):
-            plt.subplot(311 + i)
+        #
+
+        self.trajectory_to_csv()
+        #
+        # print('exiting in plot_trajectory for test purposes...')
+        # exit()
+
+        if publish:
+            import matplotlib
+
+            matplotlib.rcParams['font.sans-serif'] = "Latan Modern Roman"
+            matplotlib.rcParams['font.family'] = "serif"
+            matplotlib.rcParams['font.size'] = 8
+            matplotlib.rcParams['text.usetex'] = True
+
+            # In inches
+            fig_size_x = 3.4875;
+            fig_size_y = 2.5;
+
+            from cycler import cycler
+            monochrome = (cycler('color', ['k']) * cycler('marker', ['', '.']) *
+                          cycler('linestyle', ['-', '--', ':', '=.']))
+            plt.rc('axes', prop_cycle=monochrome)
+        else:
+            fig.suptitle('Target Position vs. Time', fontsize=10)
+
+        fig = plt.figure(figsize=(fig_size_x, fig_size_y));
+
+        plt.tight_layout(pad=0, w_pad=0, h_pad=0)
+
+        plt.subplots_adjust(left=0.185, bottom=0.15, right=0.999, top=0.98, wspace=0.2, hspace=0.2)
+
+        def m2rad(x):
+            return x/np.pi
+
+
+        def rad2m(x):
+            return np.pi * x
+
+        for i in range(2):
+            ax = plt.subplot(211 + i)
             axis_type = self.coordinate_types[self.coordinate_type]
-            for j in range(3):
+            for j in [1]:
                 plt.plot((np.array(list(range(
                     self.trajectory_samples[j][i].shape[0]))) / self.sample_rate),
-                    (self.trajectory_samples[j][i]), label=axis_type[j]+'-axis')
+                    (self.trajectory_samples[j][i])/np.pi, label=axis_type[j] + '-axis')
+
+            import matplotlib.ticker as tck
+            ax.yaxis.set_major_formatter(tck.FormatStrFormatter('%3.2f $\pi$'))
+
             if i == 0:
-                plt.legend()
-                plt.ylabel('Distance (m)')
+                # plt.legend()
+                plt.ylabel('Angle (rad)', fontsize=8)
+                plt.xticks([])
+
+                ax.yaxis.set_major_locator(tck.MultipleLocator(base=0.25))
             if i == 1:
-                plt.ylabel('Velocity (m/s)')
+                plt.ylabel('Velocity (rad$\cdot$s$^{-1}$)', fontsize=8)
+
+                ax.yaxis.set_major_locator(tck.MultipleLocator(base=0.5))
             if i == 2:
-                plt.ylabel('Acceleration (m/s/s)')
+                plt.ylabel('Acceleration (m/s/s)', fontsize=8)
         plt.xlabel('Time (s)')
-        plt.show()
+
+        if publish:
+            plt.savefig('trajectory.pdf', format='pdf')
+        else:
+            plt.show()
+            plt.close()
 
     def generate_array_samples(self):
         """
@@ -428,32 +502,58 @@ class SynthDAQ(daq.DAQ):
         doppler_samples = np.empty(doppler_samples_size, dtype=np.float64)
 
         # Generate doppler response from trajectory for each radar in array
-        for radar_idx, radar in enumerate(self.array['radar_list']):
+        for radar_idx, radar in enumerate(self.array['receivers']):
             logging.debug("generate_array_samples (%-completion): {:6.2f}".
-                          format(radar_idx * 100.0 / len(self.array['radar_list'])))
+                          format(radar_idx * 100.0 / len(self.array)))
             doppler_samples[radar_idx] = \
-                self.generate_doppler_response(radar, self.trajectory_samples)
+                self.generate_carrier_waveform(radar, self.trajectory_samples)
+
+            # complex_data = doppler_samples[radar_idx][0] + doppler_samples[radar_idx][1] * 1.0j
+            # fft_velocity = self.compute_cfft_velocity(complex_data, fft_window=2)
+            # plt.plot(fft_velocity, label='fft_velocity')
+            # plt.ylabel('frequency')
+            # plt.show()
 
         # Allocate radar sample array (I & Q)
         radar_samples_size = (self.num_channels, doppler_samples.shape[-1])
         radar_samples = np.empty(radar_samples_size, dtype=np.float64)
 
-        radar_samples = np.reshape(doppler_samples, radar_samples_size, order='F')
+        # TODO: use columns specified in yaml file
+        # radar_samples[0, :] = doppler_samples[0][0]
+        # radar_samples[1, :] = doppler_samples[0][1]
+        # radar_samples[2, :] = doppler_samples[1][0]
+        # radar_samples[3, :] = doppler_samples[1][1]
+        # radar_samples[4, :] = doppler_samples[2][0]
+        # radar_samples[5, :] = doppler_samples[2][1]
 
-        # plt.subplot(311)
-        # plt.title('doppler_samples')
-        # plt.ylabel('radians')
-        # plt.plot(time, doppler_samples[0], label='doppler_samples')
-        # plt.subplot(312)
-        # plt.title('radar_freq_response')
-        # plt.plot(time, radar_freq_response[0], label='radar_freq_response')
+        radar_samples[0, :] = doppler_samples[0][0]
+        radar_samples[1, :] = doppler_samples[0][1]
+        radar_samples[2, :] = doppler_samples[1][0]
+        radar_samples[3, :] = doppler_samples[1][1]
+
+        # if 'i-channel' in self.array[0]:
+        #     for idx, radar in enumerate(self.array):
+        #         i_ch = radar['i-channel'] - 1
+        #         q_ch = radar['q-channel'] - 1
+        #         radar_samples[i_ch] = doppler_samples[idx][0]
+        #         radar_samples[q_ch] = doppler_samples[idx][1]
+        # else:
+        #     for rad_idx in range(len(self.array)):
+        #         ch_idx = rad_idx * 2
+        #         radar_samples[ch_idx:ch_idx + 2, :] = doppler_samples[rad_idx]
+
+        #
+        # plt.subplot(211)
         # complex_data = radar_samples[0] + radar_samples[1] * 1.0j
         # fft_velocity = self.compute_cfft_velocity(complex_data, fft_window=2048, overlap=0)
-        # plt.subplot(313)
-        # plt.title('fft_velocity')
-        # plt.ylabel('radians')
         # plt.plot(fft_velocity, label='fft_velocity')
-        # # plt.legend()
+        # plt.ylabel('frequency')
+        #
+        # plt.subplot(212)
+        # complex_data = radar_samples[2] + radar_samples[3] * 1.0j
+        # fft_velocity = self.compute_cfft_velocity(complex_data, fft_window=2048, overlap=0)
+        # plt.plot(fft_velocity, label='fft_velocity')
+        # plt.ylabel('frequency')
         # plt.show()
 
         # Add sample chunks to SynthDAQ buffer
@@ -464,80 +564,227 @@ class SynthDAQ(daq.DAQ):
             array_chunk = radar_samples[..., start_idx:end_idx]
             self.ts_buffer.append(array_chunk)
 
-    def generate_doppler_response(self, radar_dict, trajectory_sample):
-        """Create new samples based on current target state.
-
-        Args:
-            radar_dict (dictionary): Dictionary object describing radar
-                location, frequency, and type.
-
-            trajectory_sample (numpy.ndarray(3, 3, sample_chunk_size)): Sample of
-                trajectory data the length of one DAQ sample.
-
-            start_time (float): time in seconds the sample started
-
-        Returns:
-            numpy.ndarray(num_channels, sample_chunk_size): Array of sampled data.
-                num_channels may be 1 or 2 depending on if radar is complex.
-
-        """
-        # Allocate space for samples
-        doppler_sample_chunk = np.empty((trajectory_sample.shape[-1],2))
+    def parallel_waveform_gen(self, idx, trajectory_sample, radar):
+        print('Entered parallel_waveform_gen...')
+        # Loop over all 3x3 StateMatrix's in the sample chunk
 
         # Get constants for conversion
         c = spc.speed_of_light
-        f0 = radar_dict['frequency']
 
-        # If no antenna cos power provided, model with cosine of power 1
-        if 'antenna_cos_power' in radar_dict:
-            antenna_cos_power = radar_dict['antenna_cos_power']
-        else:
-            antenna_cos_power = 1.0
+        waveform = radar['waveform']
+        antenna = radar['antenna']
 
-        if 'prf' in radar_dict:
-            prf = radar_dict['prf']
-        else:
-            prf = 1.0
+        # Gather waveform parameters
+        f0 = waveform['fc']
+        prf = waveform['prf']
+        pw = waveform['pw']
+        bw = waveform['bw']
+        type = waveform['type']
 
-        if 'pw' in radar_dict:
-            pw = radar_dict['pw']
-        else:
-            pw = 1.0
+        # Gather antenna parameters
+        antenna_cos_exp = antenna['cosine_exponent']
 
-        # Loop over all 3x3 StateMatrix's in the sample chunk
-        for idx in range(trajectory_sample.shape[-1]):
-            sample = StateMatrix(trajectory_sample[..., idx],
-                                 coordinate_type=self.coordinate_type)
+        sample = StateMatrix(trajectory_sample,
+                             coordinate_type=self.coordinate_type)
+        # TODO: this ^ should really be the position at t-tau, not t.
 
-            # Get sample at radar location
-            sample_rad = sample.get_state(coordinate_type='spherical',
-                                          origin=Point(*radar_dict['location']))
+        # Get sample at radar location
+        sample_rad = sample.get_state(coordinate_type='spherical',
+                                      origin=Point(*radar['location']))
 
-            # Compute phase/amplitude of the signal
-            rho = sample_rad[0, 0]
-            theta = sample_rad[2, 0]
-            # Time delay of signal
-            tau = (rho / c)
-            sample_interval = self.sample_interval
-            time = sample_interval * idx
+        # Compute phase/amplitude of the signal
+        rho = sample_rad[0, 0]
+        theta = sample_rad[2, 0]
+        # Time delay of signal
+        tau = 2 * (rho / c)
+        sample_interval = self.sample_interval
+        time = sample_interval * idx
 
-            if (time - tau) % (1.0/prf) < pw:
-                output_i = np.cos(2 * np.pi * f0 * (time - tau))\
-                            # + np.random.normal(0, 1.0)
-                output_q = np.sin(2 * np.pi * f0 * (time - tau))\
-                            # + np.random.normal(0, 1.0)
+        def T(t, pw):
+            """Compute the rollover of the LFM chirp."""
+            return t % pw
 
-                iq_sample = np.array((output_i, output_q))\
-                            * np.cos(theta)**antenna_cos_power\
-                            # * theta**(1/5)
+        # If the transmitter was on @ current_time - propagation_time
+        if (time - tau) % (1.0 / prf) < pw:
+            if type == 'lfm':
+                phase_d = 2 * np.pi * f0 * tau
+                phase_lfm = -np.pi * (bw / pw) * \
+                    (T(time, pw)**2 - T(time - tau, pw)**2)
+                complex_signal = np.exp(1.0j * phase_d + 1.0j * phase_lfm)
+                # print('s({})={}'.format(time, complex_signal))
+                output_i = complex_signal.real
+                output_q = complex_signal.imag
+            elif type == 'fmcw':
+                pwc = pw / 2
+                # Up-chrip
+                if time - tau % pw < pwc:
+                    phase = np.pi * (bw / pwc) * (time**2 + (time - tau)**2)
+                # Down-chirp
+                else:
+                    phase = -np.pi * (bw / pwc)\
+                        * (2 * pw * (time - tau) + (time - tau)**2 - 2 * tau * time
+                           + time**2)
+                output_i = np.cos(phase)
+                output_q = np.sin(phase)
             else:
-                iq_sample = np.array((0, 0))
+                phase = 2 * np.pi * f0 * (time - tau)
+                output_i = np.cos(phase)\
+                    # + np.random.normal(0, 1.0)
+                output_q = np.sin(phase)\
+                    # + np.random.normal(0, 1.0)
 
-            doppler_sample_chunk[idx] = iq_sample
-            # if idx % 1000 == 0:
-            #     print('rho:', rho)
-            #     print('tau:', tau)
-            #     print('sample:', doppler_sample_chunk[idx])
+            iq_sample = np.array((output_i, output_q))\
+                * np.cos(theta)**antenna_cos_exp\
+                # * theta**(1/5)
+        else:
+            iq_sample = np.array((0, 0))
+
+        return iq_sample
+
+    def splat_parallel_waveform_gen(self, args):
+        """Splats args into function f."""
+        print(args)
+        return self.parallel_waveform_gen(*args)
+
+    def generate_carrier_waveform(self, rx, trajectory_sample):
+        """Create new carrier waveform samples.
+
+        Args:
+            radar (dictionary): Dictionary object describing radar
+                location, waveform, and antenna parameters, etc. based on YAML.
+
+            trajectory_sample (numpy.ndarray(3, 3, sample_chunk_size)): Sample
+                of trajectory data the length of one DAQ sample.
+
+        Returns:
+            numpy.ndarray(num_channels, sample_chunk_size): Array of sampled
+                data. num_channels may be 1 or 2 depending on if radar is
+                complex.
+
+        """
+        # Allocate space for samples
+        doppler_sample_chunk = np.empty((trajectory_sample.shape[-1], 2))
+
+        # Get constants for conversion
+        c = spc.speed_of_light
+
+        # Iterate over all transmitter receiver pairs
+        rx_cos_exp = self.hpbw_to_cos(rx['antenna']['hpbw'])
+
+        for tx in self.array['transmitters']:
+
+            waveform = tx['waveform']
+            tx_hpbw = tx['antenna']['hpbw']
+
+            # Gather waveform parameters
+            f0 = waveform['f0']
+            prf = waveform['prf']
+            bw = waveform['bw']
+
+            # If no PW specified, set to 1/PRF – continuous-wave
+            if 'pw' in waveform.keys():
+                pw = waveform['pw']
+            else:
+                pw = 1/prf
+
+            waveform_type = waveform['type']
+            sample_interval = self.sample_interval
+
+            # Gather antenna parameters
+            tx_cos_exp = self.hpbw_to_cos(tx['antenna']['hpbw'])
+
+            # Loop over all 3x3 StateMatrix's in the sample chunk
+            for idx in range(trajectory_sample.shape[-1]):
+
+                # Print percent-competion message
+                if idx % 10000 == 0:
+                    percent_complete = idx / trajectory_sample.shape[-1] * 100
+                    logging.debug("radar_samples (%-completion): {:6.2f}".
+                                  format(percent_complete))
+
+                sample = StateMatrix(trajectory_sample[..., idx],
+                                     coordinate_type=self.coordinate_type)
+                # TODO: this ^ should really be the position at t-tau, not t.
+
+                # Get sample at radar location
+                rx_rad = sample.get_state(coordinate_type='spherical',
+                                          origin=Point(*rx['location']))
+                tx_rad = sample.get_state(coordinate_type='spherical',
+                                          origin=Point(*tx['location']))
+
+                # Compute phase/amplitude of the signal
+                rx_rho = rx_rad[0, 0]
+                rx_theta = rx_rad[2, 0]
+                tx_rho = tx_rad[0, 0]
+                tx_theta = tx_rad[2, 0]
+
+                # Time delay of signal
+                tau = (rx_rho + tx_rho) / spc.c
+                time = sample_interval * idx
+
+                def T(t, pw):
+                    """Compute the rollover of periodic FM/PM signals."""
+                    return np.mod(t, pw)
+
+                # If the transmitter was on @ current_time - propagation_time
+                # Handles pulsed Doppler
+                if (time - tau) % (1.0 / prf) < pw:
+
+                    # Calculate carrier phases
+                    carrier_tx_phase = 2.0 * np.pi * f0 * time
+                    carrier_rx_phase = 2.0 * np.pi * f0 * (time - tau)
+
+                    # TODO convert phase for lfm and fmcw to functions
+                    if waveform_type == 'lfm':
+                        lfm_tx_phase = np.pi * (bw / pw) * T(time,pw)**2
+                        lfm_rx_phase = np.pi * (bw / pw) * T(time - tau,pw)**2
+
+                        total_tx_phase = carrier_tx_phase + lfm_tx_phase
+                        total_rx_phase = carrier_rx_phase + lfm_rx_phase
+                    elif waveform_type == 'fmcw':
+                        # Alternate up and down chirp every pw seconds
+                        # Compute transmitted chrip
+                        if (time // pw) % 2 == 0:
+                            # up-chirp
+                            lfm_tx_phase = np.pi * (bw / pw) * T(time,pw)**2
+                        else:
+                            # down-chirp
+                            lfm_tx_phase = np.pi * (bw / pw) * (2 * pw * T(time,pw) - T(time,pw)**2)
+
+                        # Compute received chrip
+                        td = (time - tau)
+                        if (td // pw) % 2 == 0:
+                            # up-chirp
+                            lfm_rx_phase = np.pi * (bw / pw) * T(td,pw)**2
+                        else:
+                            # down-chirp
+                            lfm_rx_phase = np.pi * (bw / pw) * (2 * pw * T(td,pw) - T(td,pw)**2)
+
+                        total_tx_phase = carrier_tx_phase + lfm_tx_phase
+                        total_rx_phase = carrier_rx_phase + lfm_rx_phase
+                    elif waveform_type == 'cw':
+                        total_tx_phase = carrier_tx_phase
+                        total_rx_phase = carrier_rx_phase
+                    else:
+                        raise TypeError('Wavform type not supported')
+
+                    carrier_tx = np.exp(1.0j * total_tx_phase)
+                    carrier_rx = np.exp(1.0j * total_rx_phase)
+
+                    # TODO: Add fading effect
+                    complex_if = carrier_rx * np.conjugate(carrier_tx)
+
+                    output_i = complex_if.real
+                    output_q = complex_if.imag
+
+                    # Apply cosine beam approximation
+                    iq_sample = np.array((output_i, output_q)) \
+                                * np.cos(rx_theta)**rx_cos_exp \
+                                * np.cos(tx_theta)**tx_cos_exp
+                else:
+                    iq_sample = np.array((0, 0))
+
+                doppler_sample_chunk[idx, :] = iq_sample
 
         return doppler_sample_chunk.transpose()
 
@@ -545,13 +792,13 @@ class SynthDAQ(daq.DAQ):
         """
         Control generation of DAQ data.
 
-        TODO: Possibly remove real-time availability
-              use VirtualDAQ for playback
-        TODO: Update base class to _get_samples(self)
-
         Required function called by sample_loop method of pyratk.daq.DAQ base
         class to copy data into the buffers.
         """
+        # TODO: Remove real-time availability
+        #       use VirtualDAQ for playback
+        # TODO: Update base class to _get_samples(self)
+
         # self._generate_new_sample(self.sample_num)
         #
         # self.buffer.append((self.data, self.sample_num))
@@ -578,9 +825,10 @@ class SynthDAQ(daq.DAQ):
         self.radar_samples = []
 
     # === DEBUGGING FUNCTIONS ===
-    def compute_cfft_velocity(self, complex_data, overlap=0, fft_window=4096, fft_size=2**18, f0=24.15e9):
+    def compute_cfft_velocity(self, complex_data, overlap=0, fft_window=2048,
+                              fft_size=2**18, f0=24.15e9):
         # Get constants for conversion
-        c = spc.speed_of_light
+        # c = spc.speed_of_light
 
         velocity_list = []
 
@@ -594,15 +842,19 @@ class SynthDAQ(daq.DAQ):
             fft_complex = np.fft.fft(complex_data_window, fft_size)
             fft_complex = np.fft.fftshift(fft_complex)
 
-            fft_mag = np.linalg.norm([fft_complex.real, fft_complex.imag], axis=0)
+            fft_mag = np.linalg.norm([fft_complex.real, fft_complex.imag],
+                                     axis=0)
 
             bin_size = self.sample_rate / fft_mag.shape[0]
             bin = np.argmax(fft_mag).astype(np.int32)
             freq_fft = (bin - fft_mag.shape[0] / 2) * bin_size
 
-            wavelength = c / f0
-            fft_velocity = freq_fft * wavelength / 2
+            # wavelength = c / f0
+            # fft_velocity = freq_fft * wavelength / 2
             # velocity_list.append(fft_velocity)
-            velocity_list.append(freq_fft * np.pi * 2)
+            velocity_list.append(freq_fft)
 
         return velocity_list
+
+    def hpbw_to_cos(self, hpbw):
+        return np.log10(0.5) / np.log10(np.cos(hpbw / 2.0))

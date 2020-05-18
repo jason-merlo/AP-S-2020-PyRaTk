@@ -304,7 +304,7 @@ class DataManager(MuxBuffer):
         num_chunks = data.shape[0]
         num_channels = data.shape[1]
 
-        new_shape = (num_channels, num_chunks * chunk_size)
+        new_shape = (num_channels, (num_chunks * chunk_size) + 1)
         new_data = np.empty(new_shape)
 
         for chunk_idx in range(num_chunks):
@@ -319,8 +319,12 @@ class DataManager(MuxBuffer):
         start = 0
         step = self.source.sample_interval
         stop = new_data.shape[0] * step
-        sample_times = np.array([np.arange(start, stop, step)]).transpose()
+        sample_times = np.array([np.linspace(start, stop, new_data.shape[0])]).transpose()
 
+        print('sample_times.shape:', sample_times.shape)
+        print('new_data.shape:', new_data.shape)
+
+        # Insert time columns into new_data
         new_data = np.insert(new_data, [i for i in range(num_channels)],
                              sample_times, axis=1)
 
@@ -340,6 +344,17 @@ class DataManager(MuxBuffer):
         for i in range(num_channels):
             header_3.append('Channel name')
             header_3.append('"Input {:d}"'.format(i))
+        # if 'i-channel' in self.source.array['radar_list'][0]:
+        #     for idx, radar in enumerate(self.source.array['radar_list']):
+        #         i_ch = radar['i-channel'] - 1
+        #         q_ch = radar['q-channel'] - 1
+        #         radar_samples[i_ch] = doppler_samples[idx][0]
+        #         radar_samples[q_ch] = doppler_samples[idx][1]
+        # else:
+        #     for rad_idx in range(len(self.source.array)):
+        #         ch_idx = rad_idx * 2
+        #         radar_samples[ch_idx:ch_idx + 2, :] = doppler_samples[rad_idx]
+
         header.append(','.join(header_3))
 
         header_4 = ('Unit','"V"') * num_channels
