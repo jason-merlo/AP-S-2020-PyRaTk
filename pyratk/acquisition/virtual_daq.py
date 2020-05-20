@@ -23,30 +23,6 @@ class VirtualDAQ(daq.DAQ):
     def __init__(self):
         """Create virtual DAQ object to play back recording (hdf5 dataset)."""
         super().__init__()
-        # Attributes
-        self.sample_rate = None
-        self.sample_chunk_size = None
-        self.daq_type = None
-        self.num_channels = None
-
-        # start paused if no dataset is selected
-        self.paused = True
-        # Fake sampler period
-        self.sample_period = None
-
-        # Create data member to store samples
-        self.data = None
-        self.ds = None
-
-        # create member data to store trajectory samples for ground truth
-        self.ts = None
-        # Current time index of recording
-        self.sample_index = 0
-
-        # Reset/load button sample thread locking
-        # self.reset_lock = threading.Event()
-
-        self.t_sampling = threading.Thread(target=self.sample_loop)
 
     def load_dataset(self, ds):
         """Select dataset to read from and loads attributes."""

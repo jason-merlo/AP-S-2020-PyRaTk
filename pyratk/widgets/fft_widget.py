@@ -13,7 +13,8 @@ import time                     # Used for FPS calculations
 
 
 class FftWidget(pg.GraphicsLayoutWidget):
-    def __init__(self, radar, vmax_len=100, show_max_plot=False):
+    def __init__(self, radar, vmax_len=100, show_max_plot=False,
+                 fft_yrange=[-100,100], fft_xrange=[-5000,5000]):
         super(FftWidget, self).__init__()
 
         # Copy arguments to member variables
@@ -50,8 +51,8 @@ class FftWidget(pg.GraphicsLayoutWidget):
             self.nextRow()
 
         # Calculate reasonable ranges for FFT peak outputs
-        fft_xrange = [-50 / self.radar.bin_size, 50 / self.radar.bin_size]
-        fft_yrange = [-100, 0]
+        # fft_xrange = [-50 / self.radar.bin_size, 50 / self.radar.bin_size]
+        # fft_yrange = [-100, 0]
 
         # Add FFT plot
         self.fft_plot = self.addPlot()
@@ -63,7 +64,8 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.fft_plot.setRange(disableAutoRange=True,
                                xRange=fft_xrange, yRange=fft_yrange)
         self.fft_plot.setLimits(
-            xMin=fft_xrange[0], xMax=fft_xrange[1], yMin=-80, yMax=0)
+            xMin=fft_xrange[0], xMax=fft_xrange[1],
+            yMin=fft_yrange[0], yMax=fft_yrange[1])
         self.fft_pw = self.fft_plot.plot()
         self.fft_max_freq_line = pg.InfiniteLine(angle=90, movable=False)
         self.fft_max_pwr_line = pg.InfiniteLine(angle=0, movable=False)
