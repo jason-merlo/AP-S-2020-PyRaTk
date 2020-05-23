@@ -14,7 +14,7 @@ import time                     # Used for FPS calculations
 
 class FftWidget(pg.GraphicsLayoutWidget):
     def __init__(self, radar, vmax_len=100, show_max_plot=False,
-                 fft_yrange=[-100,100], fft_xrange=[-5000,5000]):
+                 fft_yrange=[-100,100], fft_xrange=[-50000,50000]):
         super(FftWidget, self).__init__()
 
         # Copy arguments to member variables
@@ -24,7 +24,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.vmax_len = vmax_len
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
-        self.show_max_plot = show_max_plot and False
+        self.show_max_plot = show_max_plot
 
         # Add FFT max plot to layout
         if show_max_plot:
@@ -38,8 +38,8 @@ class FftWidget(pg.GraphicsLayoutWidget):
                 xMax=0, yMax=20, yMin=-20)
             self.vmax_pw = self.vmax_plot.plot()
 
-            self.vmax_line = pg.InfiniteLine(angle=0, movable=False)
-            self.vmax_plot.addItem(self.vmax_line)
+            # self.vmax_line = pg.InfiniteLine(angle=0, movable=False)
+            # self.vmax_plot.addItem(self.vmax_line)
 
             # self.a_pw = self.vmax_plot.plot()
             self.vmax_plot.setLabel('left', text="Radial Velocity", units="m/s")
@@ -53,6 +53,9 @@ class FftWidget(pg.GraphicsLayoutWidget):
         # Calculate reasonable ranges for FFT peak outputs
         # fft_xrange = [-50 / self.radar.bin_size, 50 / self.radar.bin_size]
         # fft_yrange = [-100, 0]
+
+        for r in fft_xrange:
+            r /= self.radar.bin_size
 
         # Add FFT plot
         self.fft_plot = self.addPlot()
@@ -74,7 +77,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.fft_ax_bottom = self.fft_plot.getAxis('bottom')
         self.fft_ax_bottom.setScale(self.radar.bin_size)
         self.fft_plot.setLabel('bottom', text="Frequency", units="Hz")
-        self.fft_plot.setLabel('left', text="Power", units="dBm")
+        self.fft_plot.setLabel('left', text="PSD", units="dBv")
 
         # FPS ticker data
         self.lastTime = time.time()
@@ -87,7 +90,7 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.vmax_pw.setData(vmax_data, pen=pg.mkPen({'color': "FFF"}))
         self.vmax_pw.setPos(-vmax_ptr, 0)
 
-        self.vmax_line.setValue(vmax_data[-1])
+        # self.vmax_line.setValue(vmax_data[-1])
 
         # a_data = self.radar.ts_a.data
         # a_ptr = self.radar.ts_a.head_ptr

@@ -19,6 +19,7 @@ from pyqtgraph import QtCore
 
 from pyratk.formatting import warning
 
+from profilehooks import profile
 
 # CONSTANTS
 POWER_THRESHOLD = 4  # dBm
@@ -36,7 +37,7 @@ class Radar(object):
     """
 
     # === INITIALIZATION METHODS ==============================================
-    def __init__(self, data_mgr, data_idx, loc=Point(),
+    def __init__(self, data_mgr, index, loc=Point(),
                  f0=24.150e9, fft_size=2**16, fft_win_size=2**12,
                  cluda_thread=None):
         super(Radar, self).__init__()
@@ -55,7 +56,7 @@ class Radar(object):
         # Data stream parameters
         # TODO: create DataStream object representing I or I/Q data
         self.data_mgr = data_mgr
-        self.index = data_idx
+        self.index = index
 
         # Physical parameters
         self.f0 = f0
@@ -128,8 +129,7 @@ class Radar(object):
     # === CONTROL METHODS =====================================================
     def update(self, data):
         # Get data from data_mgr
-        channel_slice = 2 * self.index
-        data_slice = data[channel_slice:channel_slice + 2]
+        data_slice = np.array((data[self.index[0]], data[self.index[1]]))
 
         # TODO remove ts_data, use data_mgr.ts_buffer instead
         self.ts_data.append(data_slice)
@@ -156,11 +156,10 @@ class Radar(object):
         #     self.fmax = self.bin_to_freq(vmax_bin)
 
         self.drho = self.freq_to_vel(self.fmax)
-        print('(radar.py) radar', self.index, 'drho:', self.drho)
+        # print('(radar.py) radar', self.index, 'drho:', self.drho)
 
     def reset(self):
         """Reset all radar data."""
-        print("(radar.py) Resetting radar {:}...".format(self.index))
         self.ts_data.clear()
 
 
@@ -210,12 +209,13 @@ class RadarArray(QtCore.QObject):
             radar.reset()
         self.last_sample_index = -1
 
+    # @profile(immediate=True)
     def update(self, data_tuple):
         """Update all radars in array."""
         # start_time = time.time()
         data, sample_index = data_tuple
 
-        print('(radar.py) sample_num:', sample_index)
+        # print('(radar.py) sample_num:', sample_index)
 
         if sample_index == self.last_sample_index + 1:
             self.reset_flag = False

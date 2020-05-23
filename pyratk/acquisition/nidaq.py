@@ -121,24 +121,21 @@ class nidaq(DAQ):
         time.sleep(sleep_time)
 
 
-        def run(self):
-            if self.running == False:
-                # Spawn sampling thread
-                self.running = True
-                self.t_sampling = threading.Thread(target=self.sample_loop)
+    def run(self):
+        if self.running == False:
+            # Spawn sampling thread
+            self.running = True
+            self.t_sampling = threading.Thread(target=self.sample_loop)
 
-                # Trigger DAQ to start running
-                self.start()
-
-                try:
-                    if not self.t_sampling.is_alive():
-                        print('Staring sampling thread')
-                        self.t_sampling.start()
-                    self.paused = False
-                except RuntimeError as e:
-                    print('Error starting sampling thread: ', e)
-            else:
-                print('Warning: Not starting new sampling thread; sampling thread already running!')
+            try:
+                if not self.t_sampling.is_alive():
+                    print('Staring sampling thread')
+                    self.t_sampling.start()
+                self.paused = False
+            except RuntimeError as e:
+                print('Error starting sampling thread: ', e)
+        else:
+            print('Warning: Not starting new sampling thread; sampling thread already running!')
 
     def start(self):
         self.run()
@@ -153,5 +150,5 @@ class nidaq(DAQ):
                 self.t_sampling.join()
             except Exception as e:
                 print("Error closing sampling thread: ", e)
-                
+
         super().close()
