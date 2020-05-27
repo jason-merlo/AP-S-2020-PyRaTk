@@ -25,6 +25,7 @@ class IQWidget(pg.GraphicsLayoutWidget):
 
         # Add FFT plot
         self.iq_plot = self.addPlot()
+        self.iq_plot.addLegend()
 
         # Set up fft plot
         self.iq_plot.setDownsampling(mode='peak')
@@ -35,11 +36,17 @@ class IQWidget(pg.GraphicsLayoutWidget):
         # self.iq_plot.setLimits(
         #     xMin=fft_xrange[0], xMax=fft_xrange[1],
         #     yMin=fft_yrange[0], yMax=fft_yrange[1])
-        self.i_pw = self.iq_plot.plot()
-        self.q_pw = self.iq_plot.plot()
+        self.i_pw = self.iq_plot.plot(
+            pen=pg.mkPen({'color': "F00"}),
+            name='I-Ch.'
+        )
+        self.q_pw = self.iq_plot.plot(
+            pen=pg.mkPen({'color': "0F0"}),
+            name='Q-Ch.'
+        )
         self.iq_ax_bottom = self.iq_plot.getAxis('bottom')
         # self.iq_ax_bottom.setScale(self.radar.bin_size)
-        self.iq_plot.setLabel('bottom', text="Time", units="S")
+        self.iq_plot.setLabel('bottom', text="Samples", units="S")
         self.iq_plot.setLabel('left', text="Amplitude", units="V")
 
         # FPS ticker data
@@ -49,8 +56,8 @@ class IQWidget(pg.GraphicsLayoutWidget):
     def update_plot(self):
         if self.radar.ts_data.data.shape[0] != 0:
             iq_data = np.abs(self.radar.ts_data[-1])
-            self.i_pw.setData(iq_data[0, :], pen=pg.mkPen({'color': "F00"}))
-            self.q_pw.setData(iq_data[1, :], pen=pg.mkPen({'color': "0F0"}))
+            self.i_pw.setData(iq_data[0, :])
+            self.q_pw.setData(iq_data[1, :])
 
     def update_fps(self):
         now = time.time()
