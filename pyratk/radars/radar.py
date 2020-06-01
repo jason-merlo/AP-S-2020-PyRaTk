@@ -13,6 +13,7 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 import numpy as np              # Storing data
 from pyratk.datatypes.ts_data import TimeSeries     # storing data
 import scipy.constants as spc   # speed of light
+from scipy import signal        # Upsampling
 from pyratk.datatypes.geometry import Point         # radar location
 # from pyratk.datatypes.motion import StateMatrix   # track location
 from pyqtgraph import QtCore
@@ -39,6 +40,7 @@ class Radar(object):
     # === INITIALIZATION METHODS ==============================================
     def __init__(self, data_mgr, index, loc=Point(),
                  f0=24.150e9, fft_size=2**16, fft_win_size=2**12,
+                 interp_size=25e3,
                  cluda_thread=None):
         super(Radar, self).__init__()
         """
@@ -65,11 +67,12 @@ class Radar(object):
         # Processing parameters
         self.fft_size = fft_size
         self.window_size = fft_win_size
+        self.interp_size = int(interp_size)
 
         # Derived processing parameters
         self.update_rate = self.data_mgr.sample_rate / self.data_mgr.sample_chunk_size
-        self.center_bin = np.ceil(self.fft_size / 2)
-        self.bin_size = self.data_mgr.sample_rate / self.fft_size
+        self.center_bin = np.ceil(self.interp_size / 2)
+        self.bin_size = self.data_mgr.sample_rate / self.interp_size
 
         # === State variables ===
         # initial array size 4096 samples
@@ -106,7 +109,7 @@ class Radar(object):
         """Compute frequency based on bin location."""
         return (bin - self.center_bin) * float(self.bin_size)
 
-    def compute_cfft(self, complex_data, fft_size):
+    def compute_cfft(self, complex_data, fft_size, interp_size=1000):
         """Compute fft and fft magnitude for plotting."""
         # Create hanning window
         # hanning = np.hanning(complex_data.shape[0])
@@ -123,6 +126,8 @@ class Radar(object):
 
         # Display only magnitude
         fft_mag = np.linalg.norm([fft_complex.real, fft_complex.imag], axis=0)
+
+        fft_mag = signal.resample(fft_mag, interp_size)
 
         return fft_mag
 
@@ -143,7 +148,7 @@ class Radar(object):
 
         # Calculate complex FFT
         # may be zero-padded if fft-size > sample_chunk_size
-        self.cfft_data = self.compute_cfft(window_slice, self.fft_size)
+        self.cfft_data = self.compute_cfft(window_slice, self.fft_size, self.interp_size)
 
         # Find maximum frequency
         fmax_bin = np.argmax(self.cfft_data)

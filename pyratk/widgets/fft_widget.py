@@ -9,12 +9,13 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 """
 import pyqtgraph as pg          # Used for RadarWidget superclass
 import numpy as np              # Used for numerical operations
+from scipy import signal        # Used for upsampling
 import time                     # Used for FPS calculations
 
 
 class FftWidget(pg.GraphicsLayoutWidget):
     def __init__(self, radar, vmax_len=100, show_max_plot=False,
-                 fft_yrange=[-100,100], fft_xrange=[-50000,50000]):
+                 fft_yrange=[-100,100], fft_xrange=[-25e3,25e3]):
         super(FftWidget, self).__init__()
 
         # Copy arguments to member variables
@@ -54,9 +55,6 @@ class FftWidget(pg.GraphicsLayoutWidget):
         # fft_xrange = [-50 / self.radar.bin_size, 50 / self.radar.bin_size]
         # fft_yrange = [-100, 0]
 
-        for r in fft_xrange:
-            r /= self.radar.bin_size
-
         # Add FFT plot
         self.fft_plot = self.addPlot()
 
@@ -65,7 +63,8 @@ class FftWidget(pg.GraphicsLayoutWidget):
         self.fft_plot.setClipToView(True)
         # self.fft_plot.setLogMode(x=False, y=True)  # Log Y-axis of FFT views
         self.fft_plot.setRange(disableAutoRange=True,
-                               xRange=fft_xrange, yRange=fft_yrange)
+                               xRange=np.array(fft_xrange)/self.radar.bin_size,
+                               yRange=fft_yrange)
         self.fft_plot.setLimits(
             xMin=fft_xrange[0], xMax=fft_xrange[1],
             yMin=fft_yrange[0], yMax=fft_yrange[1])
@@ -106,11 +105,11 @@ class FftWidget(pg.GraphicsLayoutWidget):
     def update_fft(self):
         if self.radar.cfft_data is not None:
             log_fft = 10 * np.log(self.radar.cfft_data)
-            max_log_fft = np.max(log_fft)
             self.fft_pw.setData(log_fft)
             self.fft_pw.setPos(-self.radar.center_bin, 0)
 
             # draw max FFT lines
+            max_log_fft = np.nanmax(log_fft)
             self.fft_max_freq_line.setValue(self.radar.fmax
                                             / self.radar.bin_size)
             self.fft_max_pwr_line.setValue(max_log_fft)
