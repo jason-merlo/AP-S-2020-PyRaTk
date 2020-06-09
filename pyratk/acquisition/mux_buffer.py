@@ -54,6 +54,9 @@ class MuxBuffer(QtCore.QObject):
 
     @property
     def sample_rate(self):
+        print('(MuxBuffer) self:', self)
+        print('(MuxBuffer) source_list:', self.source_list)
+        print('(MuxBuffer) source:', self.source)
         return self.source.sample_rate
 
     @property

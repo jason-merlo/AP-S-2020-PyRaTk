@@ -13,13 +13,14 @@ import time                     # Used for FPS calculations
 
 
 class IQWidget(pg.GraphicsLayoutWidget):
-    def __init__(self, radar, yrange=None, max_len=None):
-        super(IQWidget, self).__init__()
+    def __init__(self, receiver, yrange=None, max_len=None):
+        super().__init__()
 
         # Copy arguments to member variables
-        self.data_mgr = radar.data_mgr
-        self.source = self.data_mgr.source
-        self.radar = radar
+        print(type(receiver))
+        self.daq = receiver.daq
+        self.source = self.daq.source
+        self.receiver = receiver
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
 
@@ -45,7 +46,7 @@ class IQWidget(pg.GraphicsLayoutWidget):
             name='Q-Ch.'
         )
         self.iq_ax_bottom = self.iq_plot.getAxis('bottom')
-        # self.iq_ax_bottom.setScale(self.radar.bin_size)
+        # self.iq_ax_bottom.setScale(self.receiver.bin_size)
         self.iq_plot.setLabel('bottom', text="Samples", units="S")
         self.iq_plot.setLabel('left', text="Amplitude", units="V")
 
@@ -54,8 +55,8 @@ class IQWidget(pg.GraphicsLayoutWidget):
         self.fps = None
 
     def update_plot(self):
-        if self.radar.ts_data.data.shape[0] != 0:
-            iq_data = np.abs(self.radar.ts_data[-1])
+        if self.daq.ts_buffer.data.shape[0, 0] != 0:
+            iq_data = self.receiver.ts_data[-1].real
             self.i_pw.setData(iq_data[0, :])
             self.q_pw.setData(iq_data[1, :])
 
@@ -76,5 +77,5 @@ class IQWidget(pg.GraphicsLayoutWidget):
 
     def reset(self):
         # When paused, redraw after reset
-        if self.data_mgr.paused:
+        if self.daq.paused:
             self.update()

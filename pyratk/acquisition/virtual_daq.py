@@ -24,6 +24,13 @@ class VirtualDAQ(daq.DAQ):
         """Create virtual DAQ object to play back recording (hdf5 dataset)."""
         super().__init__()
 
+        # Create temp attributes
+        self.sample_rate = 1
+        self.sample_chunk_size = 1
+        self.daq_type = "None"
+        self.num_channels = 1
+        self.sample_period = self.sample_chunk_size / self.sample_rate
+
     def load_dataset(self, ds):
         """Select dataset to read from and loads attributes."""
         if isinstance(ds, h5py._hl.dataset.Dataset):
@@ -32,6 +39,7 @@ class VirtualDAQ(daq.DAQ):
         else:
             raise(TypeError,
                   "load_dataset expects a h5py dataset type, got", type(ds))
+
 
         # Load attributes
         self.sample_rate = ds.attrs["sample_rate"]
@@ -44,6 +52,9 @@ class VirtualDAQ(daq.DAQ):
         length = 4096
         shape = (self.num_channels, self.sample_chunk_size)
         self.ts_buffer = TimeSeries(length, shape)
+
+        print('(VirtualDAQ) Loaded dataset:', ds.name)
+        print('(VirtualDAQ) Sample period:', self.sample_period)
 
     def load_trajectory(self, ts):
         """Load trajectory dataset."""
@@ -65,7 +76,7 @@ class VirtualDAQ(daq.DAQ):
             except IndexError:
                 print("Invalid sample index:", self.sample_index)
 
-            if self.ts:
+            if hasattr(self, 'ts'):
                 self._append_trajectory(self.sample_index)
 
             # Delay by sample period
@@ -77,7 +88,7 @@ class VirtualDAQ(daq.DAQ):
                 raise ValueError("Value must be -1, 0, or 1.")
 
             # Append tarjectory before emitting new data signal
-            if self.ts:
+            if hasattr(self, 'ts'):
                 self.ts_trajectory.append(self.trajectory_data)
 
             new_data = (self.data, self.sample_index)
@@ -91,7 +102,7 @@ class VirtualDAQ(daq.DAQ):
                 self.sample_index = next_index
             else:
                 self.sample_index = 0
-                if self.ts:
+                if hasattr(self, 'ts'):
                     self.ts_trajectory.clear()
                     self._append_trajectory(self.sample_index)
                 self.reset_signal.emit()
@@ -117,8 +128,60 @@ class VirtualDAQ(daq.DAQ):
     def reset(self):
         """Reset all data to beginning of data file and begin playing."""
         self.close()
-        if self.ts:
+        if hasattr(self, 'ts'):
             self.ts_trajectory.clear()
             self._append_trajectory(self.sample_index)
         self.sample_index = 0
         self.run()
+
+    # === SAMPLING ======================================================
+    def sample_loop(self):
+        """Call get_samples forever."""
+
+        while self.running:
+            if self.paused:
+                # warning('(daq.py) daq paused...')
+                time.sleep(0.1)  # sleep 100 ms
+            else:
+                self.get_samples()
+
+                new_data = (self.data, self.sample_num)
+
+                # Set the update event to True once data is read in
+                self.data_available_signal.emit(new_data)
+                self.ts_buffer.append(self.data)
+
+                # Incriment sample number
+                self.sample_num += 1
+
+        print("Sampling thread stopped.")
+
+
+    def run(self):
+        if self.running == False:
+            # Spawn sampling thread
+            self.running = True
+            self.t_sampling = threading.Thread(target=self.sample_loop)
+
+            try:
+                if not self.t_sampling.is_alive():
+                    print('Staring sampling thread')
+                    self.t_sampling.start()
+                self.paused = False
+            except RuntimeError as e:
+                print('Error starting sampling thread: ', e)
+        else:
+            print('Warning: Not starting new sampling thread; sampling thread already running!')
+
+    def start(self):
+        self.run()
+
+    def close(self):
+        if hasattr(self, 't_sampling') and self.t_sampling.is_alive():
+            print("Stopping sampling thread...")
+            try:
+                self.t_sampling.join()
+            except Exception as e:
+                print("Error closing sampling thread: ", e)
+
+        super().close()

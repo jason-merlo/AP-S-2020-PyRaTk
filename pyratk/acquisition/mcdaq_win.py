@@ -12,7 +12,8 @@ from pyratk.acquisition.daq import DAQ
 # Used for Measurement Computing hardware
 from mcculw import ul
 from mcculw.enums import (ScanOptions, Status, FunctionType, EventType,
-                          InfoType, BoardInfo, ULRange, ErrorCode)
+                          TrigType, InfoType, BoardInfo, ULRange, ErrorCode,
+                          InterfaceType)
 from mcculw.ul import ULError
 
 import ctypes
@@ -32,8 +33,21 @@ class mcdaq_win(DAQ):
         self._high_channel = high_channel
 
         self._board_num = 0
+        self._pretrig_count = 0
+
+        # Get available devices
+        dev_list = ul.get_daq_device_inventory(InterfaceType.ANY)
+        print("Available Devices:", dev_list)
+
+        if dev_list == []:
+            raise Exception('No DAQ devices found')
+
         print(self._get_available_ranges())
-        self._range = self._get_available_ranges()[-1]
+        try:
+            self._range = self._get_available_ranges()[-1]
+        except IndexError:
+            self._range = -1
+
         print('Using range: ', self._range)
 
         channel_count = self._high_channel - self._low_channel + 1
@@ -45,12 +59,16 @@ class mcdaq_win(DAQ):
         self._ctypes_array = ctypes.cast(self._memhandle,
                                          ctypes.POINTER(ctypes.c_double))
 
-        self._scan_options = (ScanOptions.BACKGROUND | ScanOptions.CONTINUOUS
-                              | ScanOptions.SCALEDATA)
+        self._scan_options = (ScanOptions.BACKGROUND #| ScanOptions.CONTINUOUS
+                              | ScanOptions.SCALEDATA | ScanOptions.EXTTRIGGER
+                              | ScanOptions.BURSTIO)
 
         self._event_types = (EventType.ON_DATA_AVAILABLE
                              | EventType.ON_END_OF_INPUT_SCAN
                              | EventType.ON_SCAN_ERROR)
+
+        self._trig_types = (TrigType.TRIG_POS_EDGE)
+
 
         self._last_index = 0
 
@@ -85,6 +103,11 @@ class mcdaq_win(DAQ):
 
         # Start the acquisition.
         try:
+
+            # Configure triggering
+            ul.set_trigger(self._board_num, self._trig_types,
+                0, 0)
+
             # Run the scan
             ul.a_in_scan(
                 self._board_num, self._low_channel, self._high_channel,
@@ -125,6 +148,12 @@ class mcdaq_win(DAQ):
 
             # Incriment sample number
             self.sample_num += 1
+
+            ul.stop_background(self._board_num, FunctionType.AIFUNCTION)
+            ul.a_in_scan(
+                self._board_num, self._low_channel, self._high_channel,
+                self._buffer_size, self.sample_rate, self._range,
+                self._memhandle, self._scan_options)
 
         elif event_type == EventType.ON_SCAN_ERROR:
             exception = ULException(event_data)

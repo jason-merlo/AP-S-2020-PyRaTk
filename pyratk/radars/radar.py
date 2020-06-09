@@ -13,7 +13,7 @@ Maintainer: Jason Merlo (merlojas@msu.edu)
 import numpy as np              # Storing data
 from pyratk.datatypes.ts_data import TimeSeries     # storing data
 import scipy.constants as spc   # speed of light
-from scipy import signal        # Upsampling
+from scipy import signal        # Upsampling, bh window
 from pyratk.datatypes.geometry import Point         # radar location
 # from pyratk.datatypes.motion import StateMatrix   # track location
 from pyqtgraph import QtCore
@@ -22,13 +22,11 @@ from pyratk.formatting import warning
 
 from profilehooks import profile
 
-# CONSTANTS
-POWER_THRESHOLD = 4  # dBm
+from collections import namedtuple
 
-
-class Radar(object):
+class Receiver(object):
     """
-    Object to hold Radar information and signal processing.
+    Object to hold Radar Receiver information and signal processing.
 
     It is assumed radars will have both I and Q channels.
 
@@ -38,70 +36,64 @@ class Radar(object):
     """
 
     # === INITIALIZATION METHODS ==============================================
-    def __init__(self, data_mgr, index, loc=Point(),
-                 f0=24.150e9, fft_size=2**16, fft_win_size=2**12,
-                 interp_size=25e3,
-                 cluda_thread=None):
-        super(Radar, self).__init__()
+    def __init__(self, daq, daq_index, transmitter, loc=Point(),
+                 fast_fft_size=2**12, fast_fft_window_type=None,
+                 slow_fft_size=2**12, slow_fft_window_type=None,
+                 slow_fft_len=20):
+        super().__init__()
         """
         Initialize radar object.
 
+        Note: Currently only FMCW or CW radars are supported.
+
         Args:
-            data_mgr
-                [data_mgr] object for DAQ configurations
-            data_idx
-                Index of radar channels in DAQ output.  The I and Q channels
-                must be adjacent (ex. Ch. 1 --> 1 & 2, Ch. 2 --> 3 & 4...)
+            daq
+                [daq] object for DAQ configurations
+            daq_index
+                Index of radar I & Q channels in DAQ output
+            transmitter
+                Transmitter object
             loc
                 Point() indicating the location of the radar
+
         """
         # Data stream parameters
         # TODO: create DataStream object representing I or I/Q data
-        self.data_mgr = data_mgr
-        self.index = index
+        self.daq = daq
+        self.daq_index = daq_index
 
         # Physical parameters
-        self.f0 = f0
+        self.transmitter = transmitter
         self.loc = loc
 
         # Processing parameters
-        self.fft_size = fft_size
-        self.window_size = fft_win_size
-        self.interp_size = int(interp_size)
+        self.fast_fft_size = fast_fft_size
+        self.fast_fft_window_type = fast_fft_window_type
+        self.slow_fft_size = slow_fft_size
+        self.slow_fft_window_type = slow_fft_window_type
+        self.slow_fft_len = slow_fft_len
 
+        self.init_data()
+        self.connect_signals()
+
+    def init_data(self):
         # Derived processing parameters
-        self.update_rate = self.data_mgr.sample_rate / self.data_mgr.sample_chunk_size
-        self.center_bin = np.ceil(self.interp_size / 2)
-        self.bin_size = self.data_mgr.sample_rate / self.interp_size
+        self.fast_center_bin = np.ceil(self.fast_fft_size / 2)
+        self.fast_bin_size = self.daq.sample_rate / self.fast_fft_size
+        self.slow_center_bin = np.ceil(self.slow_fft_size / 2)
+        self.slow_bin_size = self.daq.sample_rate / self.slow_fft_size
 
-        # === State variables ===
-        # initial array size 4096 samples
-        length = 4096
-        chunk_size = self.data_mgr.source.sample_chunk_size
-        data_shape = (2, chunk_size)
+    def connect_signals(self):
+        # self.daq.reset_signal.connect(self.reset)
+        pass
 
-        # initialize data arrays
-        # NOTE: cfft_data initialize to ones for log graph – log(0) is undef.
-        self.ts_data = TimeSeries(length, data_shape, dtype=np.complex64)
-        self.data_buffer = TimeSeries(length, (1,), dtype=np.complex64)
-        self.cfft_data = np.ones(self.fft_size, dtype=np.float64)
-
-        # Instantaneous state variables
-        self.fmax = 0
-        # negative --> towards radar; positive --> away from radar
-        self.drho = 0
-
-    #     self.connect_signals()
-    #
-    # def connect_signals(self):
-    #     self.data_mgr.reset_signal.connect(self.reset)
 
     # === HELPER METHODS ======================================================
     def freq_to_vel(self, freq):
-        """Compute the velocity for a given frequency and the radar f0."""
+        """Compute the velocity for a given frequency and the radar fc."""
         c = spc.speed_of_light
-        # velocity = (c * self.f0 / (freq + self.f0)) - c
-        velocity = (freq * c) / (2 * self.f0)
+        # velocity = (c * self.fc / (freq + self.fc)) - c
+        velocity = (freq * c) / (2 * self.fc)
 
         return velocity
 
@@ -109,14 +101,16 @@ class Radar(object):
         """Compute frequency based on bin location."""
         return (bin - self.center_bin) * float(self.bin_size)
 
-    def compute_cfft(self, complex_data, fft_size, interp_size=1000):
+    def compute_cfft(self, complex_data, fft_size):
         """Compute fft and fft magnitude for plotting."""
-        # Create hanning window
-        # hanning = np.hanning(complex_data.shape[0])
+        # Create blackman-harris window
+        # window = signal.blackmanharris(complex_data.shape[0])
+        # window = signal.hamming(complex_data.shape[0])
+        window = np.ones(complex_data.shape[0])
 
         # Create zero-padded array to be transformed
         fft_array = np.zeros((fft_size,), dtype=np.complex64)
-        fft_array[:complex_data.size] = complex_data  # * hanning
+        fft_array[:complex_data.size] = complex_data * window
 
         # Normalize FFT magnitude to window size
         fft_complex = np.fft.fft(fft_array, norm='ortho')
@@ -127,28 +121,27 @@ class Radar(object):
         # Display only magnitude
         fft_mag = np.linalg.norm([fft_complex.real, fft_complex.imag], axis=0)
 
-        fft_mag = signal.resample(fft_mag, interp_size)
-
         return fft_mag
 
     # === CONTROL METHODS =====================================================
     def update(self, data):
-        # Get data from data_mgr
-        data_slice = np.array((data[self.index[0]], data[self.index[1]]))
+        # Get data from daq
+        data_slice = np.array((data[self.daq_index[0]], data[self.daq_index[1]]))
 
-        # TODO remove ts_data, use data_mgr.ts_buffer instead
-        self.ts_data.append(data_slice)
         # self.data_buffer = np.append(self.data_buffer, iq_data_slice)
 
         # Get window of FFT data
-        window_idx = self.window_size // self.data_mgr.sample_chunk_size
+        window_idx = self.window_size // self.daq.sample_chunk_size
         window_slice_pair = self.ts_data[-window_idx:, ...]
         window_slice = window_slice_pair[:, 0, :].flatten() \
             + window_slice_pair[:, 1, :].flatten() * 1.0j
+        # window_slice = window_slice_pair[:, 1, :].flatten()
+
+        window_slice -= np.mean(window_slice.real) + np.mean(window_slice.imag) * 1.0j
 
         # Calculate complex FFT
         # may be zero-padded if fft-size > sample_chunk_size
-        self.cfft_data = self.compute_cfft(window_slice, self.fft_size, self.interp_size)
+        self.cfft_data = self.compute_cfft(window_slice, self.fft_size)
 
         # Find maximum frequency
         fmax_bin = np.argmax(self.cfft_data)
@@ -161,38 +154,109 @@ class Radar(object):
         #     self.fmax = self.bin_to_freq(vmax_bin)
 
         self.drho = self.freq_to_vel(self.fmax)
-        # print('(radar.py) radar', self.index, 'drho:', self.drho)
 
     def reset(self):
         """Reset all radar data."""
-        self.ts_data.clear()
+        self.init_data()
+
+    @property
+    def datacube(frames):
+        """
+        Create datacube with specified number of most recent frames.
+
+        Returns a complex datacube.  Final shape will be:
+        frames x slow_fft_len x samples_per_chirp
+        """
+        idx = self.daq_index
+        samples = self.daq.sample_rate = self.transmitter.pulses[0].delay
+        return self.daq.ts_buffer[-frames:, idx[0], samples] \
+               + 1.0j * self.daq.ts_buffer[-frames:, idx[1], samples]
 
 
-class RadarArray(QtCore.QObject):
+class Transmitter(object):
     """
-    Hold timeseries data of array measurements.
+    Object to hold Radar Transmitter information.
+
+    Note: This class may perform transmitter control functions in the future.
+    """
+
+    def __init__(self, data_mgr, pulses, loc=Point()):
+        super().__init__()
+        """
+        Initialize radar object.
+
+        Note: Currently only FMCW or CW radars are supported.
+
+        Args:
+            data_mgr
+                [data_mgr] object for DAQ configurations
+            loc
+                Point() indicating the location of the radar
+            pulses
+                List of pulse namedtuple objects containing fc, bw, and delay
+
+                fc
+                    Center frequency of transmit waveform
+                bw
+                    Bandwidth of transmit chirp waveform
+                delay
+                    Delay time between start of chirp
+
+        """
+        self.data_mgr = data_mgr
+        self.pulses = pulses
+
+        # Currently only one pulse is supported due to datacube restrictions
+        if len(self.pulses) != 1:
+            raise NotImplementedError('Only one pulse segment is currently'
+            ' supported due to datacube processing restrictions')
+
+
+class Radar(QtCore.QObject):
+    """
+    Holds radar Transmitter and Receiver objects.
+
+    Note: all iterable functions still only iterate over receiver for
+    backwards compatibility with old RadarArray structure.
 
     Attributes:
-        radars
-            A list of radar objects in the array
+        tranmitters (namedtuple)
+            location (Point)
+            pulses (namedtuple)
+                fc
+                    Pulse waveform center frequency
+                bw
+                    Pulse waveform bandwidth
+                delay
+                    Time between start of waveform modulation
+
+        receivers (namedtuple)
+            daq_index (tuple)
+                tuple containing index of I and Q channels on DAQ
+            location (Point)
+
+        fast_fft_size
+        fast_fft_window_type
+        slow_fft_size
+        slow_fft_window_type
+        slow_fft_len
 
     """
     data_available_signal = QtCore.pyqtSignal()
 
-    def __init__(self, data_mgr, radar_list):
-        """
-        Initialize radar array.
-
-        Args:
-            radar_list
-                List of Radar objects in array
-        """
+    def __init__(self,
+        daq,
+        transmitter_list,
+        receiver_list,
+        fast_fft_size=2**10,
+        fast_fft_window_type=None,
+        slow_fft_size=2**12,
+        slow_fft_window_type=None,
+        slow_fft_len=100
+    ):
         super().__init__()
 
-        # copy arguments into member variables
-        self.data_mgr = data_mgr
-        self.radars = radar_list
-        # self.initial_update = True
+        self.daq = daq
 
         # Used for iterator magic functions
         self.idx = 0
@@ -200,18 +264,45 @@ class RadarArray(QtCore.QObject):
         # Flag to iqnore any stale data after a reset
         self.last_sample_index = -1
 
+        # Create recievers and transmitters
+        self.transmitters = []
+        self.receivers = []
+
+        for transmitter in transmitter_list:
+            self.transmitters.append(
+                Transmitter(
+                    self.daq,
+                    transmitter.pulses
+                )
+            )
+
+        for receiver in receiver_list:
+            self.receivers.append(
+                Receiver(
+                    self.daq,
+                    receiver.daq_index,
+                    self.transmitters[0],
+                    receiver.location,
+                    fast_fft_size,
+                    fast_fft_window_type,
+                    slow_fft_size,
+                    slow_fft_window_type,
+                    slow_fft_len
+                )
+            )
+
         # Configure Signals
         self.connect_signals()
 
     def connect_signals(self):
         """Connect signals for event driven operation."""
-        self.data_mgr.data_available_signal.connect(self.update)
-        self.data_mgr.reset_signal.connect(self.reset)
+        self.daq.data_available_signal.connect(self.update)
+        self.daq.reset_signal.connect(self.reset)
 
     def reset(self):
         """Clear all temporal data from radars in array."""
-        for radar in self.radars:
-            radar.reset()
+        for receiver in self.receivers:
+            receiver.reset()
         self.last_sample_index = -1
 
     # @profile(immediate=True)
@@ -224,16 +315,17 @@ class RadarArray(QtCore.QObject):
 
         if sample_index == self.last_sample_index + 1:
             self.reset_flag = False
-            for radar in self.radars:
-                radar.update(data)
+            for receiver in self.receivers:
+                receiver.update(data)
 
             # Emit data available signal for dependant tasks
             self.data_available_signal.emit()
 
             self.last_sample_index = sample_index
         else:
-            print('(radar.py) last_sample_index:', self.last_sample_index)
-            warning('(radar.py) ignoring stale data...')
+            # print('(radar.py) last_sample_index:', self.last_sample_index)
+            # warning('(radar.py) ignoring stale data...')
+            pass
 
         # print('(radar.py) radar_array.update() ran in {:} (s)'
         #       .format(time.time() - start_time))
@@ -241,12 +333,12 @@ class RadarArray(QtCore.QObject):
     def __getitem__(self, i):
         """Return radar in array."""
         assert(i < len(self)), "index greater than flattened array size"
-        return self.radars[i]
+        return self.receivers[i]
 
     def __len__(self):
         """Return length of radar array."""
         # compute sumproduct of array shape
-        return len(self.radars)
+        return len(self.receivers)
 
     def __iter__(self):
         """Return self for iterator."""
@@ -256,7 +348,7 @@ class RadarArray(QtCore.QObject):
         """Return next radar object for iterator."""
         if self.idx < len(self):
             self.idx += 1
-            return self.radars[self.idx - 1]
+            return self.receivers[self.idx - 1]
         else:
             self.idx = 0
             raise StopIteration()

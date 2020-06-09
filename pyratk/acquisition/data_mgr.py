@@ -48,6 +48,7 @@ class DataManager(MuxBuffer):
         # Open virtual daq for playback
         self.virt_daq = VirtualDAQ()
         self.add_source(self.virt_daq)
+        self.set_source(self.virt_daq)
         self.daq = daq
 
         self.source_reset_signal.connect(self.reset_signal.emit)
