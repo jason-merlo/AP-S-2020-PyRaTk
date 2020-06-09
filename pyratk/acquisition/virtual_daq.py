@@ -106,6 +106,7 @@ class VirtualDAQ(daq.DAQ):
                     self.ts_trajectory.clear()
                     self._append_trajectory(self.sample_index)
                 self.reset_signal.emit()
+                print('(VirtualDAQ) Reset signal emit (looped)')
 
             # Return True if more data
             return (self.sample_index + stride) % self.ds.shape[0] / stride < 1.0
@@ -153,6 +154,7 @@ class VirtualDAQ(daq.DAQ):
 
                 # Incriment sample number
                 self.sample_num += 1
+                # print('(VirtualDAQ) sample_loop: sample_num', self.sample_num)
 
         print("Sampling thread stopped.")
 
@@ -177,11 +179,11 @@ class VirtualDAQ(daq.DAQ):
         self.run()
 
     def close(self):
+        super().close()
+
         if hasattr(self, 't_sampling') and self.t_sampling.is_alive():
             print("Stopping sampling thread...")
             try:
                 self.t_sampling.join()
             except Exception as e:
                 print("Error closing sampling thread: ", e)
-
-        super().close()

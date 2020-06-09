@@ -83,6 +83,7 @@ class mcdaq_win(DAQ):
         #     print("="*80)
 
     def start(self):
+        print('Started mcdaq')
         self.run()
 
     def run(self):
@@ -118,6 +119,8 @@ class mcdaq_win(DAQ):
             self._last_index = 0
             self._last_time = datetime.now()
             self.paused = False
+
+            print('Finished configuring mcdaq: running...')
         except Exception as e:
             print("Error encountered while starting sampling: ", e)
 

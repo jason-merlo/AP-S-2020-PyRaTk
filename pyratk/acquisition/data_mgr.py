@@ -51,8 +51,6 @@ class DataManager(MuxBuffer):
         self.set_source(self.virt_daq)
         self.daq = daq
 
-        self.source_reset_signal.connect(self.reset_signal.emit)
-
         # DEVEL/DEBUG
         try:
             self.open_database(db)

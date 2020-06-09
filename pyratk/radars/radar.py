@@ -83,6 +83,14 @@ class Receiver(object):
         self.slow_center_bin = np.ceil(self.slow_fft_size / 2)
         self.slow_bin_size = self.daq.sample_rate / self.slow_fft_size
 
+        self.fast_fft_data = np.ones(self.fast_fft_size)
+        self.slow_fft_data = np.ones(self.slow_fft_size)
+
+        self.fast_fmax = 0
+        self.slow_fmax = 0
+
+        self.data = None
+
     def connect_signals(self):
         # self.daq.reset_signal.connect(self.reset)
         pass
@@ -99,7 +107,7 @@ class Receiver(object):
 
     def bin_to_freq(self, bin):
         """Compute frequency based on bin location."""
-        return (bin - self.center_bin) * float(self.bin_size)
+        return (bin - self.fast_center_bin) * float(self.fast_bin_size)
 
     def compute_cfft(self, complex_data, fft_size):
         """Compute fft and fft magnitude for plotting."""
@@ -126,26 +134,25 @@ class Receiver(object):
     # === CONTROL METHODS =====================================================
     def update(self, data):
         # Get data from daq
-        data_slice = np.array((data[self.daq_index[0]], data[self.daq_index[1]]))
+        self.data = data_slice = np.array((data[self.daq_index[0]], data[self.daq_index[1]]))
 
         # self.data_buffer = np.append(self.data_buffer, iq_data_slice)
 
         # Get window of FFT data
-        window_idx = self.window_size // self.daq.sample_chunk_size
-        window_slice_pair = self.ts_data[-window_idx:, ...]
-        window_slice = window_slice_pair[:, 0, :].flatten() \
-            + window_slice_pair[:, 1, :].flatten() * 1.0j
+        window_idx = self.slow_fft_size // self.daq.sample_chunk_size
+        window_slice = data_slice[0, :].flatten() \
+            + data_slice[ 1, :].flatten() * 1.0j
         # window_slice = window_slice_pair[:, 1, :].flatten()
 
         window_slice -= np.mean(window_slice.real) + np.mean(window_slice.imag) * 1.0j
 
         # Calculate complex FFT
         # may be zero-padded if fft-size > sample_chunk_size
-        self.cfft_data = self.compute_cfft(window_slice, self.fft_size)
+        self.fast_fft_data = self.compute_cfft(window_slice, self.fast_fft_size)
 
         # Find maximum frequency
-        fmax_bin = np.argmax(self.cfft_data)
-        self.fmax = self.bin_to_freq(fmax_bin)
+        fmax_bin = np.argmax(self.fast_fft_data)
+        self.fast_fmax = self.bin_to_freq(fmax_bin)
 
         # Power Thresholding
         # if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
@@ -153,7 +160,7 @@ class Receiver(object):
         # else:
         #     self.fmax = self.bin_to_freq(vmax_bin)
 
-        self.drho = self.freq_to_vel(self.fmax)
+        # self.drho = self.freq_to_vel(self.fmax)
 
     def reset(self):
         """Reset all radar data."""
@@ -321,11 +328,12 @@ class Radar(QtCore.QObject):
             # Emit data available signal for dependant tasks
             self.data_available_signal.emit()
 
-            self.last_sample_index = sample_index
+            # print('Updating radar, current_index: ', sample_index)
         else:
-            # print('(radar.py) last_sample_index:', self.last_sample_index)
+            # print('(radar.py) last_sample_index: {}\tcurrent_index:{}'.format(self.last_sample_index, sample_index))
             # warning('(radar.py) ignoring stale data...')
             pass
+        self.last_sample_index = sample_index
 
         # print('(radar.py) radar_array.update() ran in {:} (s)'
         #       .format(time.time() - start_time))

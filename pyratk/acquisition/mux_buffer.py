@@ -31,7 +31,7 @@ class MuxBuffer(QtCore.QObject):
     def add_source(self, source):
         self.source_list.append(source)
         source.data_available_signal.connect(self.data_available_signal.emit)
-        source.reset_signal.connect(self.source_reset_signal.emit)
+        source.reset_signal.connect(self.reset_signal.emit)
 
     def set_source(self, source):
         # Pause current source
@@ -54,9 +54,6 @@ class MuxBuffer(QtCore.QObject):
 
     @property
     def sample_rate(self):
-        print('(MuxBuffer) self:', self)
-        print('(MuxBuffer) source_list:', self.source_list)
-        print('(MuxBuffer) source:', self.source)
         return self.source.sample_rate
 
     @property

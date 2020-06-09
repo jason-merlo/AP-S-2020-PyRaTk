@@ -141,6 +141,7 @@ class nidaq(DAQ):
         self.run()
 
     def close(self):
+        super().close()
         self.task.close()  # Close nidaq gracefully
 
         if self.t_sampling.is_alive():
@@ -150,5 +151,3 @@ class nidaq(DAQ):
                 self.t_sampling.join()
             except Exception as e:
                 print("Error closing sampling thread: ", e)
-
-        super().close()

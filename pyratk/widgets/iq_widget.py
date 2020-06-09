@@ -55,8 +55,8 @@ class IQWidget(pg.GraphicsLayoutWidget):
         self.fps = None
 
     def update_plot(self):
-        if self.daq.ts_buffer.data.shape[0, 0] != 0:
-            iq_data = self.receiver.ts_data[-1].real
+        if self.receiver.data is not None:
+            iq_data = self.receiver.data.real
             self.i_pw.setData(iq_data[0, :])
             self.q_pw.setData(iq_data[1, :])
 

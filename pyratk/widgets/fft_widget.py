@@ -88,8 +88,8 @@ class FftWidget(pg.GraphicsLayoutWidget):
 
     def update_fmax(self):
         # Update fmax graph
-        if not np.all(self.radar.cfft_data == self.radar.cfft_data[0]):
-            self.fmax_data.append(self.radar.fmax)
+        if not np.all(self.radar.fast_fft_data == self.radar.fast_fft_data[0]):
+            self.fmax_data.append(self.radar.fast_fmax)
         self.fmax_pw.setData(self.fmax_data, pen=pg.mkPen({'color': "FFF"}))
         self.fmax_pw.setPos(-len(self.fmax_data), 0)
 
@@ -107,20 +107,20 @@ class FftWidget(pg.GraphicsLayoutWidget):
             pass
 
     def update_fft(self):
-        if self.radar.cfft_data is not None:
-            log_fft = 10 * np.log(self.radar.cfft_data)
+        if self.radar.fast_fft_data is not None:
+            log_fft = 10 * np.log(self.radar.fast_fft_data)
             self.fft_pw.setData(log_fft)
-            self.fft_pw.setPos(-self.radar.center_bin, 0)
+            self.fft_pw.setPos(-self.radar.fast_center_bin, 0)
 
             # draw max FFT lines
             max_log_fft = np.nanmax(log_fft)
-            self.fft_max_freq_line.setValue(self.radar.fmax
+            self.fft_max_freq_line.setValue(self.radar.fast_fmax
                                             / self.radar.fast_bin_size)
             self.fft_max_pwr_line.setValue(max_log_fft)
 
         self.fft_plot.setTitle(
             'Max Frequency:\t{:+0.4f} (Hz) @ {:+0.3f} (dBV)'.format(
-                self.radar.fmax, max_log_fft))
+                self.radar.fast_fmax, max_log_fft))
 
     def update_fps(self):
         now = time.time()
