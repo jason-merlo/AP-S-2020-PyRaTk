@@ -20,13 +20,15 @@ class SpectrogramWidget(pg.PlotWidget):
         super(SpectrogramWidget, self).__init__()
 
         # Copy arguments to member variables
-        self.data_mgr = radar.data_mgr
+        self.data_mgr = radar.daq
         self.source = self.data_mgr.source
         self.radar = radar
         self.spectrogram_length = spectrogram_length
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
         self.show_max_plot = show_max_plot
+
+        self.fft_xrange = fft_xrange
 
         # TODO temp
         self.speed = 10
@@ -97,7 +99,7 @@ class SpectrogramWidget(pg.PlotWidget):
         self.addItem(self.img)
 
         # Allocate image array to store spectrogram
-        self.img_array = np.zeros((int(self.radar.cfft_data.size / self.downsample), spectrogram_length))
+        self.img_array = np.zeros((round(self.radar.fast_fft_data.size / self.downsample), spectrogram_length))
 
         # Get the colormap
         colormap = cm.get_cmap("jet")  # cm.get_cmap("CMRmap")
@@ -114,13 +116,13 @@ class SpectrogramWidget(pg.PlotWidget):
         # yscale = (log_freq_range[-1] / self.img_array.shape[0])
         # self.img.scale((1. / self.source.sample_rate) * self.source.chunk_size / self.speed, yscale)
         # self.setLogMode(y=True)
-        self.img.scale(1, self.radar.bin_size * self.downsample)
+        self.img.scale(1, self.radar.fast_bin_size * self.downsample)
 
         self.setRange(disableAutoRange=True, yRange=np.array(fft_xrange))
         self.setLimits(
             yMin=-self.source.sample_rate/2, yMax=self.source.sample_rate/2)
 
-        self.img.translate(0, -self.radar.cfft_data.size / (2 * self.downsample))
+        self.img.translate(0, -self.radar.fast_fft_data.size / (2 * self.downsample))
 
         self.setLabel('left', 'Frequency', units='Hz')
         self.showGrid(x=False, y=True)
@@ -139,9 +141,9 @@ class SpectrogramWidget(pg.PlotWidget):
         ALPHA = 0.75
         AVG_SAMPLES = 2*self.speed
 
-        if self.radar.cfft_data is not None:
+        if self.radar.fast_fft_data is not None:
 
-            downsampled = self.radar.cfft_data[::self.downsample]
+            downsampled = self.radar.fast_fft_data[::self.downsample]
 
             log_fft = 10 * np.log(downsampled)
 
@@ -175,3 +177,18 @@ class SpectrogramWidget(pg.PlotWidget):
         # When paused, redraw after reset
         if self.data_mgr.paused:
             self.update()
+        self.rescale()
+
+    def rescale(self):
+        self.img.resetTransform()
+
+        self.update_period = \
+            self.source.sample_chunk_size / self.source.sample_rate
+
+        self.img.scale(1, self.radar.fast_bin_size * self.downsample)
+
+        self.setRange(disableAutoRange=True, yRange=np.array(self.fft_xrange))
+        self.setLimits(
+            yMin=-self.source.sample_rate/2, yMax=self.source.sample_rate/2)
+
+        self.img.translate(0, -self.radar.fast_fft_data.size / (2 * self.downsample))
