@@ -186,13 +186,16 @@ class Receiver(object):
 
 
         # Calculate slow-time complex FFT
-        if self.datacube[-1].shape == self.datacube[-2].shape:
-            dc = self.datacube[-1] - self.datacube[-2]
-        else:
-            dc = self.datacube[-1]
+
         # print('dc.shape',dc.shape)
-        self.fft_mat = self.compute_fft2(dc, (self.slow_fft_size, self.fast_fft_size))
+        self.fft_mat = self.compute_fft2(self.datacube[-1], (self.slow_fft_size, self.fast_fft_size))
         # print('fft_mat.shape', self.fft_mat.shape)
+
+        # if self.datacube[-1].shape == self.datacube[-2].shape:
+        #     if hasattr(self, 'zero_fft_mat'):
+        #         self.fft_mat -= self.zero_fft_mat
+        #     else:
+        #         self.zero_fft_mat = self.fft_mat
 
         # Power Thresholding
         # if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
