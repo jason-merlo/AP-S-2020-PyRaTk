@@ -10,11 +10,16 @@ Dependencies: mcculw
 from pyratk.acquisition.daq import DAQ
 
 # Used for Measurement Computing hardware
-from mcculw import ul
-from mcculw.enums import (ScanOptions, Status, FunctionType, EventType,
-                          TrigType, InfoType, BoardInfo, ULRange, ErrorCode,
-                          InterfaceType)
-from mcculw.ul import ULError
+SUPPORTED = True
+try:
+    from mcculw import ul
+    from mcculw.enums import (ScanOptions, Status, FunctionType, EventType,
+                              TrigType, InfoType, BoardInfo, ULRange, ErrorCode,
+                              InterfaceType)
+    from mcculw.ul import ULError
+except:
+    SUPPORTED = False
+    print('`mcculw` not found on this system')
 
 import ctypes
 from collections import namedtuple
@@ -27,64 +32,69 @@ class mcdaq_win(DAQ):
     def __init__(self, sample_rate=50000, sample_chunk_size=5000,
                  low_channel=0, high_channel=7):
 
-        self.daq_type = "MC-DAQ-WIN"
+        if SUPPORTED:
 
-        self._low_channel = low_channel
-        self._high_channel = high_channel
+            self.daq_type = "MC-DAQ-WIN"
 
-        self._board_num = 0
-        self._pretrig_count = 0
+            self._low_channel = low_channel
+            self._high_channel = high_channel
 
-        # Get available devices
-        dev_list = ul.get_daq_device_inventory(InterfaceType.ANY)
-        print("Available Devices:", dev_list)
+            self._board_num = 0
+            self._pretrig_count = 0
 
-        if dev_list == []:
-            raise Exception('No DAQ devices found')
+            # Get available devices
+            dev_list = ul.get_daq_device_inventory(InterfaceType.ANY)
+            print("Available Devices:", dev_list)
 
-        print(self._get_available_ranges())
-        try:
-            self._range = self._get_available_ranges()[-1]
-        except IndexError:
-            self._range = -1
+            if dev_list == []:
+                raise Exception('No DAQ devices found')
 
-        print('Using range: ', self._range)
+            print(self._get_available_ranges())
+            try:
+                self._range = self._get_available_ranges()[-1]
+            except IndexError:
+                self._range = -1
 
-        channel_count = self._high_channel - self._low_channel + 1
-        self._buffer_size = sample_chunk_size * channel_count
+            print('Using range: ', self._range)
 
-        super().__init__(sample_rate, sample_chunk_size, channel_count)
+            channel_count = self._high_channel - self._low_channel + 1
+            self._buffer_size = sample_chunk_size * channel_count
 
-        self._memhandle = ul.scaled_win_buf_alloc(self._buffer_size)
-        self._ctypes_array = ctypes.cast(self._memhandle,
-                                         ctypes.POINTER(ctypes.c_double))
+            super().__init__(sample_rate, sample_chunk_size, channel_count)
 
-        self._scan_options = (ScanOptions.BACKGROUND #| ScanOptions.CONTINUOUS
-                              | ScanOptions.SCALEDATA | ScanOptions.EXTTRIGGER
-                              | ScanOptions.BURSTIO)
+            self._memhandle = ul.scaled_win_buf_alloc(self._buffer_size)
+            self._ctypes_array = ctypes.cast(self._memhandle,
+                                             ctypes.POINTER(ctypes.c_double))
 
-        self._event_types = (EventType.ON_DATA_AVAILABLE
-                             | EventType.ON_END_OF_INPUT_SCAN
-                             | EventType.ON_SCAN_ERROR)
+            self._scan_options = (ScanOptions.BACKGROUND #| ScanOptions.CONTINUOUS
+                                  | ScanOptions.SCALEDATA | ScanOptions.EXTTRIGGER
+                                  | ScanOptions.BURSTIO)
 
-        self._trig_types = (TrigType.TRIG_POS_EDGE)
+            self._event_types = (EventType.ON_DATA_AVAILABLE
+                                 | EventType.ON_END_OF_INPUT_SCAN
+                                 | EventType.ON_SCAN_ERROR)
+
+            self._trig_types = (TrigType.TRIG_POS_EDGE)
 
 
-        self._last_index = 0
+            self._last_index = 0
 
-        # Create new sampling task
-        # try:
-        #     pass
-        # except Exception as e:
-        #     self.daq_type = "FakeDAQ"
-        #     print("="*80)
-        #     print("Warning: Exception occurred opening DAQ. Using fake data.")
-        #     print(e)
-        #     print("="*80)
+            # Create new sampling task
+            # try:
+            #     pass
+            # except Exception as e:
+            #     self.daq_type = "FakeDAQ"
+            #     print("="*80)
+            #     print("Warning: Exception occurred opening DAQ. Using fake data.")
+            #     print(e)
+            #     print("="*80)
 
     def start(self):
-        print('Started mcdaq')
-        self.run()
+        if SUPPORTED:
+            print('Started mcdaq')
+            self.run()
+        else:
+            print('`mcculw` not available, not starting DAQ.')
 
     def run(self):
         # Stop any AI task running
@@ -166,7 +176,8 @@ class mcdaq_win(DAQ):
             print('\nThe scan is complete\n')
 
     def close(self):
-        ul.stop_background(self._board_num, FunctionType.AIFUNCTION)
+        if SUPPORTED:
+            ul.stop_background(self._board_num, FunctionType.AIFUNCTION)
         super().close()
 
     def _get_available_ranges(self):
