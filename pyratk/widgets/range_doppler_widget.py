@@ -50,8 +50,8 @@ class RangeDopplerWidget(pg.PlotWidget):
 
         # set colormap
         self.img.setLookupTable(lut)
-        # self.img.setLevels([-70, 10]) # Good for drone
-        self.img.setLevels([-10, 20]) # Good for drone
+        self.img.setLevels([-80, 10]) # Good for drone
+        #self.img.setLevels([-10, 20]) # Good for drone
 
         self.rescale()
 
@@ -102,7 +102,7 @@ class RangeDopplerWidget(pg.PlotWidget):
 
     def update(self):
         self.update_map()
-        self.update_fps()
+        #self.update_fps()
 
     def reset(self):
         # When paused, redraw after reset
