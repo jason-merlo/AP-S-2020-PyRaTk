@@ -31,7 +31,7 @@ class SpectrogramWidget(pg.PlotWidget):
         self.fft_xrange = fft_xrange
 
         # TODO temp
-        self.speed = 10
+        self.speed = 5
         self.downsample = 10
 
         # Add FFT max plot to layout
@@ -139,7 +139,7 @@ class SpectrogramWidget(pg.PlotWidget):
 
     def update_spectrogram(self):
         ALPHA = 0.75
-        AVG_SAMPLES = 2*self.speed
+        AVG_SAMPLES = 1*self.speed
 
         if self.radar.fast_fft_data is not None:
 
@@ -155,7 +155,7 @@ class SpectrogramWidget(pg.PlotWidget):
 
             self.img.setImage(self.img_array.T, autoLevels=False, autoDownsample=True)
 
-            print(self.getAxis("left").range)
+            # print(self.getAxis("left").range)
 
     def update_fps(self):
         now = time.time()

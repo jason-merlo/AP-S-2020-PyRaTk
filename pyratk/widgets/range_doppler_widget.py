@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Data-Cube Widget Class.
+RangeDoppler Widget Class.
 
-Contains RadarWidget class used to visualize a radar Data-Cube represenataion
-of fast- and slow-time data.
+Contains RadarWidget class used to range-Doppler graphs
 
 Author: Jason Merlo
 Maintainer: Jason Merlo (merlojas@msu.edu)
@@ -15,22 +14,22 @@ import time                     # Used for FPS calculations
 from matplotlib import cm       # Used for colormaps
 
 
-class DataCubeWidget(pg.PlotWidget):
-    def __init__(self, radar, fast_time_yrange=[-90,20],
-        fast_time_xrange=[-5e3,5e3]):
-        super(SpectrogramWidget, self).__init__()
+class RangeDopplerWidget(pg.PlotWidget):
+    def __init__(self, receiver, xrange=[-50,50], yrange=[-15e3,0]):
+        super().__init__()
 
         # Copy arguments to member variables
-        self.data_mgr = radar.data_mgr
-        self.source = self.data_mgr.source
-        self.radar = radar
-        self.spectrogram_length = spectrogram_length
+        self.daq = receiver.daq
+        self.source = self.daq.source
+        self.receiver = receiver
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
-        self.show_max_plot = show_max_plot
+
+        self.xrange = xrange
+        self.yrange = yrange
 
         # TODO temp
-        self.downsample = 10
+        self.downsample = 1
 
         # FPS ticker data
         self.lastTime = time.time()
@@ -42,7 +41,7 @@ class DataCubeWidget(pg.PlotWidget):
         self.addItem(self.img)
 
         # Allocate image array to store spectrogram
-        self.img_array = np.zeros((int(self.radar.cfft_data.size / self.downsample), spectrogram_length))
+        # self.img_array = np.zeros(np.around(np.array(self.receiver.fft_mat.shape) / self.downsample).astype(np.int))
 
         # Get the colormap
         colormap = cm.get_cmap("jet")  # cm.get_cmap("CMRmap")
@@ -51,48 +50,43 @@ class DataCubeWidget(pg.PlotWidget):
 
         # set colormap
         self.img.setLookupTable(lut)
-        self.img.setLevels([-90, 0])
+        self.img.setLevels([-50, 20])
 
-        self.img.scale(1, self.radar.bin_size * self.downsample)
-
-        self.setRange(disableAutoRange=True, yRange=np.array(fft_xrange))
-        self.setLimits(
-            yMin=-self.source.sample_rate/2, yMax=self.source.sample_rate/2)
-
-        self.img.translate(0, -self.radar.cfft_data.size / (2 * self.downsample))
+        self.rescale()
 
         self.setLabel('left', 'Frequency', units='Hz')
-        self.showGrid(x=False, y=True)
+        self.setLabel('bottom', 'Frequency', units='Hz')
+        self.showGrid(x=True, y=True)
 
         left_axis=self.getAxis('left')
         left_axis.setGrid(255)
 
+        # Invert y-axis so negative is "up" (corresponds with range)
+        self.getViewBox().invertY(True)
+
         self.img.setCompositionMode(pg.QtGui.QPainter.CompositionMode_Plus)
 
+        # self.setLabel('right', 'Range', 'm')
+        # right_axis=self.getAxis('right')
+        # right_axis.setScale((log_freq_range[-1] / self.img_array.shape[0]) * (FC / (2*spc.c)))
 
-    def update_datacube(self):
-        if self.radar.cfft_data is not None:
-            pass
 
-    def update_plot(self):
-        ALPHA = 0.75
-        AVG_SAMPLES = 2*self.speed
+    def update_map(self):
 
-        if self.radar.cfft_data is not None:
+        if self.receiver.fft_mat is not None:
 
-            downsampled = self.radar.cfft_data[::self.downsample]
+            downsampled = self.receiver.fft_mat[::self.downsample, ::self.downsample]
+            print('rd - downsampled.shape', downsampled.shape)
 
-            log_fft = 10 * np.log(downsampled)
+            try:
+                if not np.all(self.receiver.fast_fft_data == 0):
+                    log_fft = 10 * np.log(downsampled)
+                    print('log_fft.shape', log_fft.shape)
+                    self.img.setImage(log_fft, autoLevels=False, autoDownsample=True)
+            except:
+                pass
 
-            avg_samples = self.img_array[:, -AVG_SAMPLES:]
-            avg_psd = np.average(avg_samples, axis=1)
-            new_psd = avg_psd * (1-ALPHA)/self.speed + log_fft * ALPHA
-            self.img_array = np.roll(self.img_array, -self.speed, 1)
-            self.img_array[:,-self.speed:] = np.repeat(np.expand_dims(new_psd, axis=1), self.speed,axis=1)
-
-            self.img.setImage(self.img_array.T, autoLevels=False, autoDownsample=True)
-
-            print(self.getAxis("left").range)
+            # print(self.getAxis("left").range)
 
     def update_fps(self):
         now = time.time()
@@ -106,11 +100,28 @@ class DataCubeWidget(pg.PlotWidget):
         print('%0.2f fps' % self.fps)
 
     def update(self):
-        self.update_spectrogram()
+        self.update_map()
         self.update_fps()
 
     def reset(self):
-        self.fmax_data = []
         # When paused, redraw after reset
-        if self.data_mgr.paused:
+        if self.daq.paused:
             self.update()
+        self.rescale()
+
+    def rescale(self):
+        self.img.resetTransform()
+
+        self.update_period = \
+            self.source.sample_chunk_size / self.source.sample_rate
+
+        self.img.scale(self.receiver.slow_bin_size * self.downsample,
+                       self.receiver.fast_bin_size * self.downsample)
+
+        self.setRange(disableAutoRange=True, yRange=np.array(self.yrange))
+
+        self.img.translate(-np.array(self.receiver.fft_mat.shape[1]) / (2 * self.downsample),
+            -np.array(self.receiver.fft_mat.shape[0]) / (2 * self.downsample))
+
+        self.setLimits(
+            xMin=-self.source.sample_rate/(2*self.receiver.slow_bin_size), xMax=self.source.sample_rate/(2 * self.receiver.slow_bin_size))
