@@ -67,7 +67,7 @@ class VirtualDAQ(daq.DAQ):
         self.ts_trajectory = TimeSeries(length, shape)
 
 
-    def get_samples(self, stride=1, loop=-1, playback_speed=1.0):
+    def get_samples(self, stride=1, loop=-1, playback_speed=50):
         """Read sample from dataset at sampled speed, or one-by-one."""
         if self.ds:
             # Read in samples from dataset
@@ -105,7 +105,7 @@ class VirtualDAQ(daq.DAQ):
                 if hasattr(self, 'ts'):
                     self.ts_trajectory.clear()
                     self._append_trajectory(self.sample_index)
-                self.reset_signal.emit()
+                # self.reset_signal.emit()
                 print('(VirtualDAQ) Reset signal emit (looped)')
 
             # Return True if more data

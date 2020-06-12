@@ -18,7 +18,6 @@ class MuxBuffer(QtCore.QObject):
     "mux" which can select from the various input sources added.
     """
     data_available_signal = QtCore.pyqtSignal(tuple)
-    source_reset_signal = QtCore.pyqtSignal()
 
     def __init__(self):
         """Initialize MuxBuffer Class."""

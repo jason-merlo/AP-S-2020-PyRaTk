@@ -73,6 +73,8 @@ class Receiver(object):
         self.slow_fft_window_type = slow_fft_window_type
         self.slow_fft_len = slow_fft_len
 
+        self.datacube = DataCube(self)
+
         self.init_data()
         self.connect_signals()
 
@@ -81,10 +83,10 @@ class Receiver(object):
         self.fast_center_bin = np.ceil(self.fast_fft_size / 2)
         self.fast_bin_size = self.daq.sample_rate / self.fast_fft_size
         self.slow_center_bin = np.ceil(self.slow_fft_size / 2)
-        self.slow_bin_size = self.daq.sample_rate / self.slow_fft_size
+        self.slow_bin_size = self.daq.sample_rate * self.transmitter.pulses[0].delay / self.slow_fft_size
 
         self.fast_fft_data = np.ones(self.fast_fft_size)
-        self.slow_fft_data = np.ones(self.slow_fft_size)
+        self.fft_mat = np.ones((self.fast_fft_size, self.slow_fft_size))
 
         self.fast_fmax = 0
         self.slow_fmax = 0
@@ -131,28 +133,63 @@ class Receiver(object):
 
         return fft_mag
 
+    def compute_fft2(self, data, shape):
+        """
+        Compute 2D FFT over range and Doppler.
+
+        data - data to be transformed
+        shape - output shape of transform (with zero-padding)
+        """
+        # Create blackman-harris window
+        # window = signal.blackmanharris(complex_data.shape[0])
+        # window = signal.hamming(complex_data.shape[0])
+        window = np.ones(data.shape)
+
+        # Create zero-padded array to be transformed
+        fft_array = np.zeros(shape, dtype=np.complex64)
+        fft_array[:data.shape[0], :data.shape[1]] = data * window
+
+        # Normalize FFT magnitude to window size
+        fft_complex = np.fft.fft2(fft_array, norm='ortho')
+
+        # Adjust fft so DC is at the center
+        fft_complex = np.fft.fftshift(fft_complex)
+
+        # Display only magnitude
+        fft_mag = np.linalg.norm([fft_complex.real, fft_complex.imag], axis=0)
+
+        return fft_mag
+
     # === CONTROL METHODS =====================================================
     def update(self, data):
         # Get data from daq
         self.data = data_slice = np.array((data[self.daq_index[0]], data[self.daq_index[1]]))
+        #
+        # # self.data_buffer = np.append(self.data_buffer, iq_data_slice)
+        #
+        # # Get window of FFT data
+        # window_idx = self.fast_fft_size // self.daq.sample_chunk_size
+        # window_slice = data_slice[0, :].flatten() \
+        #     + data_slice[ 1, :].flatten() * 1.0j
+        # # window_slice = window_slice_pair[:, 1, :].flatten()
+        #
+        # # Subtract any DC component
+        # window_slice -= np.mean(window_slice.real) + np.mean(window_slice.imag) * 1.0j
+        #
+        #
+        # # Calculate fast-time complex FFT
+        # self.fast_fft_data = self.compute_cfft(window_slice, self.fast_fft_size)
+        #
+        # # Find maximum frequency
+        # fmax_bin = np.argmax(self.fast_fft_data)
+        # self.fast_fmax = self.bin_to_freq(fmax_bin)
 
-        # self.data_buffer = np.append(self.data_buffer, iq_data_slice)
 
-        # Get window of FFT data
-        window_idx = self.slow_fft_size // self.daq.sample_chunk_size
-        window_slice = data_slice[0, :].flatten() \
-            + data_slice[ 1, :].flatten() * 1.0j
-        # window_slice = window_slice_pair[:, 1, :].flatten()
-
-        window_slice -= np.mean(window_slice.real) + np.mean(window_slice.imag) * 1.0j
-
-        # Calculate complex FFT
-        # may be zero-padded if fft-size > sample_chunk_size
-        self.fast_fft_data = self.compute_cfft(window_slice, self.fast_fft_size)
-
-        # Find maximum frequency
-        fmax_bin = np.argmax(self.fast_fft_data)
-        self.fast_fmax = self.bin_to_freq(fmax_bin)
+        # Calculate slow-time complex FFT
+        dc = self.datacube.get_frame(-1)
+        print('dc.shape',dc.shape)
+        self.fft_mat = self.compute_fft2(dc, (self.slow_fft_size, self.fast_fft_size))
+        print('fft_mat.shape', self.fft_mat.shape)
 
         # Power Thresholding
         # if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
@@ -166,18 +203,41 @@ class Receiver(object):
         """Reset all radar data."""
         self.init_data()
 
-    @property
-    def datacube(frames):
+
+class DataCube(object):
+    def __init__(self, receiver):
+        self.receiver = receiver
+
+        self.samples_per_pulse = int(self.receiver.daq.sample_rate * self.receiver.transmitter.pulses[0].delay)
+
+    def get_frame(self, idx, num_chirps=100):
         """
         Create datacube with specified number of most recent frames.
 
         Returns a complex datacube.  Final shape will be:
-        frames x slow_fft_len x samples_per_chirp
+        frames x slow_fft_len x samples_per_pulse
         """
-        idx = self.daq_index
-        samples = self.daq.sample_rate = self.transmitter.pulses[0].delay
-        return self.daq.ts_buffer[-frames:, idx[0], samples] \
-               + 1.0j * self.daq.ts_buffer[-frames:, idx[1], samples]
+        if idx != -1:
+            raise NotImplementedError('Currenly only last frame is supported.')
+
+        idx = self.receiver.daq_index
+        datacube =  self.receiver.daq.ts_buffer[-self.receiver.slow_fft_len:, idx[0]] \
+               + 1.0j * self.receiver.daq.ts_buffer[-self.receiver.slow_fft_len:, idx[1]]
+
+        # print('datacube.shape:', datacube.shape)
+        return datacube
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            # start, stop, step = key.indices(len(self))
+            # return Seq([self[i] for i in range(start, stop, step)])
+            raise NotImplementedError('Slicing multiple frames of datacube not yet implemented.')
+        elif isinstance(key, int):
+            return self.get_frame(key)
+        elif isinstance(key, tuple):
+            raise NotImplementedError('Tuple as index')
+        else:
+            raise TypeError('Invalid argument type: {}'.format(type(key)))
 
 
 class Transmitter(object):
@@ -320,7 +380,7 @@ class Radar(QtCore.QObject):
 
         # print('(radar.py) sample_num:', sample_index)
 
-        if sample_index == self.last_sample_index + 1:
+        if sample_index > self.last_sample_index:
             self.reset_flag = False
             for receiver in self.receivers:
                 receiver.update(data)
