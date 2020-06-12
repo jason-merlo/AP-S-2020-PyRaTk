@@ -50,7 +50,7 @@ class RangeDopplerWidget(pg.PlotWidget):
 
         # set colormap
         self.img.setLookupTable(lut)
-        self.img.setLevels([-30, 30])
+        self.img.setLevels([-60, 30])
 
         self.rescale()
 

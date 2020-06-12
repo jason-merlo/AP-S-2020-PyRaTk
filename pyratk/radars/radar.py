@@ -186,7 +186,10 @@ class Receiver(object):
 
 
         # Calculate slow-time complex FFT
-        dc = self.datacube.get_frame(-1)
+        if self.datacube[-1].shape == self.datacube[-2].shape:
+            dc = self.datacube[-1] - self.datacube[-2]
+        else:
+            dc = self.datacube[-1]
         # print('dc.shape',dc.shape)
         self.fft_mat = self.compute_fft2(dc, (self.slow_fft_size, self.fast_fft_size))
         # print('fft_mat.shape', self.fft_mat.shape)
@@ -208,23 +211,35 @@ class DataCube(object):
     def __init__(self, receiver):
         self.receiver = receiver
 
+        # TODO: only supports single pulse
         self.samples_per_pulse = int(self.receiver.daq.sample_rate * self.receiver.transmitter.pulses[0].delay)
 
-    def get_frame(self, idx, num_chirps=100):
+    def get_frame(self, key):
         """
         Create datacube with specified number of most recent frames.
 
         Returns a complex datacube.  Final shape will be:
-        frames x slow_fft_len x samples_per_pulse
+        slow_fft_len x samples_per_pulse
         """
-        if idx != -1:
-            raise NotImplementedError('Currenly only last frame is supported.')
+
+        start = self.receiver.slow_fft_len * key
+        end = self.receiver.slow_fft_len * (key + 1)
 
         idx = self.receiver.daq_index
-        datacube =  self.receiver.daq.ts_buffer[-self.receiver.slow_fft_len:, idx[0]] \
-               + 1.0j * self.receiver.daq.ts_buffer[-self.receiver.slow_fft_len:, idx[1]]
+
+        if end == 0:
+            datacube =  self.receiver.daq.ts_buffer[start:, idx[0]] \
+                   + 1.0j * self.receiver.daq.ts_buffer[start:, idx[1]]
+        else:
+            datacube =  self.receiver.daq.ts_buffer[start:end, idx[0]] \
+                   + 1.0j * self.receiver.daq.ts_buffer[start:end, idx[1]]
 
         # print('datacube.shape:', datacube.shape)
+        # Subtract mean
+        mean_i = np.mean(datacube.real)
+        mean_q = np.mean(datacube.imag)
+        datacube -= mean_i + mean_q *1.0j
+
         return datacube
 
     def __getitem__(self, key):
