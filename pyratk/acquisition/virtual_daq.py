@@ -67,7 +67,7 @@ class VirtualDAQ(daq.DAQ):
         self.ts_trajectory = TimeSeries(length, shape)
 
 
-    def get_samples(self, stride=1, loop=-1, playback_speed=50):
+    def get_samples(self, stride=1, loop=-1, playback_speed=30):
         """Read sample from dataset at sampled speed, or one-by-one."""
         if self.ds:
             # Read in samples from dataset

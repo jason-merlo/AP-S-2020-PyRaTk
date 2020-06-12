@@ -50,7 +50,7 @@ class RangeDopplerWidget(pg.PlotWidget):
 
         # set colormap
         self.img.setLookupTable(lut)
-        self.img.setLevels([-50, 20])
+        self.img.setLevels([-30, 30])
 
         self.rescale()
 
@@ -76,12 +76,12 @@ class RangeDopplerWidget(pg.PlotWidget):
         if self.receiver.fft_mat is not None:
 
             downsampled = self.receiver.fft_mat[::self.downsample, ::self.downsample]
-            print('rd - downsampled.shape', downsampled.shape)
+            # print('rd - downsampled.shape', downsampled.shape)
 
             try:
                 if not np.all(self.receiver.fast_fft_data == 0):
                     log_fft = 10 * np.log(downsampled)
-                    print('log_fft.shape', log_fft.shape)
+                    # print('log_fft.shape', log_fft.shape)
                     self.img.setImage(log_fft, autoLevels=False, autoDownsample=True)
             except:
                 pass
@@ -123,5 +123,9 @@ class RangeDopplerWidget(pg.PlotWidget):
         self.img.translate(-np.array(self.receiver.fft_mat.shape[1]) / (2 * self.downsample),
             -np.array(self.receiver.fft_mat.shape[0]) / (2 * self.downsample))
 
+
+        # TODO: why is the /4 instead of /2??
+        slow_limit = self.receiver.slow_bin_size * self.receiver.slow_fft_size / 4
+
         self.setLimits(
-            xMin=-self.source.sample_rate/(2*self.receiver.slow_bin_size), xMax=self.source.sample_rate/(2 * self.receiver.slow_bin_size))
+            xMin=-slow_limit, xMax=slow_limit)
