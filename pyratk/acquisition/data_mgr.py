@@ -15,6 +15,7 @@ from pyqtgraph import QtCore
 from pyratk.formatting import warning
 import numpy as np
 import datetime
+import os
 
 
 # COMPRESSION OPTIONS
@@ -296,8 +297,17 @@ class DataManager(MuxBuffer):
         Will save trajectory_samples as ground truth if it exists.
         """
 
+        print('source: ', type(self.source))
+        print('vdaq: ', type(VirtualDAQ))
+
+        if type(self.source) == type(self.virt_daq):
+            print('(data_mgr) Pre-loading buffer...')
+            self.source.load_buffer()
+
         # Reshape array to hold contiguous samples, not chunks
         data = self.source.ts_buffer.data
+
+        print('data.shape:', data.shape)
 
         chunk_size = data.shape[2]
         num_chunks = data.shape[0]
@@ -316,8 +326,8 @@ class DataManager(MuxBuffer):
 
         # Add timestamp data per sample (to match NI readout)
         start = 0
-        step = self.source.sample_interval
-        stop = new_data.shape[0] * step
+        step = self.source.sample_period
+        stop = num_chunks * step
         sample_times = np.array([np.linspace(start, stop, new_data.shape[0])]).transpose()
 
         print('sample_times.shape:', sample_times.shape)
@@ -335,7 +345,7 @@ class DataManager(MuxBuffer):
         header_1 = ('Timestamp', date_str) * num_channels
         header.append(','.join(header_1))
 
-        header_2 = ('Interval', str(self.source.sample_interval))\
+        header_2 = ('Interval', str(self.source.sample_period))\
                     * num_channels
         header.append(','.join(header_2))
 
@@ -364,6 +374,9 @@ class DataManager(MuxBuffer):
         # Does not exist, create new entry
         try:
             samples_name = '{}.csv'.format(name)
+            base_name = '/'.join(name.split('/')[:-1])
+            if not os.path.exists(base_name):
+                os.makedirs(base_name)
             np.savetxt(samples_name, new_data,
                        header=header, fmt='%g', delimiter=',', comments='')
         except Exception as e:

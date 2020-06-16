@@ -46,7 +46,10 @@ class VirtualDAQ(daq.DAQ):
         self.sample_chunk_size = ds.attrs["sample_size"]
         self.daq_type = ds.attrs["daq_type"].decode('utf-8')
         self.num_channels = ds.attrs["num_channels"]
+
+        # Sample period (time between sample chunks being returned from DAQ)
         self.sample_period = self.sample_chunk_size / self.sample_rate
+
 
         # Create data buffers
         length = 4096
@@ -65,6 +68,36 @@ class VirtualDAQ(daq.DAQ):
         length = 4096
         shape = (3, 3)  # State matrix shape
         self.ts_trajectory = TimeSeries(length, shape)
+
+    def load_buffer(self):
+        """
+        Pre-load all samples into buffer.
+
+        Required for exporting dataset to a CSV.  May also improve performance.
+        """
+        print('Preloading buffer...')
+        if self.ds:
+            next_index = 0
+            while next_index < self.ds.shape[0]:
+                # Read in samples from dataset
+                try:
+                    self.data = self.ds[self.sample_index]
+                except IndexError:
+                    print("Invalid sample index:", self.sample_index)
+
+                if hasattr(self, 'ts'):
+                    self._append_trajectory(self.sample_index)
+                    self.ts_trajectory.append(self.trajectory_data)
+
+                self.ts_buffer.append(self.data)
+
+                next_index += 1
+
+                if next_index % 100 == 0:
+                    progress = 100 * next_index / self.ds.shape[0]
+                    print('Progress: {:.2f} %'.format(progress))
+        else:
+            raise Exception('No dataset loaded.')
 
 
     def get_samples(self, stride=1, loop=-1, playback_speed=30):

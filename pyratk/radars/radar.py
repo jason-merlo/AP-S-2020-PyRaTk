@@ -94,7 +94,7 @@ class Receiver(object):
         self.data = None
         self.fast_fft_len=int(round(self.daq.sample_rate * self.transmitter.pulses[0].delay))
         self.mti_window = np.transpose(np.tile(np.fft.fftshift(signal.windows.chebwin(self.slow_fft_len,at=60)),self.fast_fft_size).reshape((-1,self.slow_fft_len)))
-        
+
 
     def connect_signals(self):
         # self.daq.reset_signal.connect(self.reset)
@@ -192,14 +192,14 @@ class Receiver(object):
 
         # print('dc.shape',dc.shape)
         self.fft_mat = self.compute_fft2(self.datacube[-1], (self.slow_fft_size, self.fast_fft_size))
-        #self.fft_mat=np.multiply(self.fft_mat,self.mti_window)
+        self.fft_mat=np.multiply(self.fft_mat,self.mti_window)
         # print('fft_mat.shape', self.fft_mat.shape)
 
-        if self.datacube[-1].shape == self.datacube[-2].shape:
-            if hasattr(self, 'zero_fft_mat'):
-                self.fft_mat -= self.zero_fft_mat
-            else:
-                self.zero_fft_mat = self.fft_mat
+        # if self.datacube[-1].shape == self.datacube[-2].shape:
+        #     if hasattr(self, 'zero_fft_mat'):
+        #         self.fft_mat -= self.zero_fft_mat
+        #     else:
+        #         self.zero_fft_mat = self.fft_mat
 
         # Power Thresholding
         # if self.cfft_data[vmax_bin] < POWER_THRESHOLD:
