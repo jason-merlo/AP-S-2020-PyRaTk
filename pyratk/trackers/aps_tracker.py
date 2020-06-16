@@ -50,6 +50,8 @@ class ApsTracker(object):
 
         # Add new Detection objects to detections list
 
+        fft_mats = [self.receiver_array[0].fft_mat, self.receiver_array[1].fft_mat]
+
         # loc is cylindrical (R, theta, Z), but Z is ignored by plot
         R = np.random.rand() * 15
         theta = np.random.rand() * np.pi
