@@ -63,7 +63,7 @@ class PolarTrackerWidget(pg.GraphicsLayoutWidget):
         self.plot.addItem(self.det_loc_plot)
 
         # Set up plot
-        self.plot.setLimits(yMin=0)
+        #self.plot.setLimits(yMin=0)
         self.plot.setRange(yRange=[0, self.max_range], xRange=[-self.max_range, self.max_range])
         self.plot.setAspectLocked(True)
             # xMin=-self.max_range, xMax=self.max_range)

@@ -11,6 +11,7 @@ from pyratk.datatypes.ts_data import TimeSeries                # storing data
 from pyratk.datatypes.motion import StateMatrix
 from pyratk.datatypes.geometry import Point
 from pyratk.datatypes.radar import Detection
+from scipy import signal
 
 class ApsTracker(object):
     """Class to track detections using 4 doppler measurements."""
@@ -51,10 +52,19 @@ class ApsTracker(object):
         # Add new Detection objects to detections list
 
         fft_mats = [self.receiver_array[0].fft_mat, self.receiver_array[1].fft_mat]
-
+        var0=np.power(np.mean(self.receiver_array[0].fft_mat,axis=0),2)
+        var1=np.power(np.mean(self.receiver_array[1].fft_mat,axis=0),2)
+        #var0=signal.resample_poly(var00,4,1)
+        #var1=signal.resample_poly(var01,4,1)
+        f=np.linspace(-50000,50000,num=var0.size-1)
+        r_d0=np.abs(f[np.argmax(var0)]*3e8/100e9*2/3/2)
+        r_d1=np.abs(f[np.argmax(var1)]*3e8/100e9*2/3/2)
+        theta=np.arcsin((r_d0-r_d1)/0.3864)+0.5*np.pi
+        R=0.5*(r_d0+r_d1)
+        
         # loc is cylindrical (R, theta, Z), but Z is ignored by plot
-        R = np.random.rand() * 15
-        theta = np.random.rand() * np.pi
+        #R = np.random.rand() * 15
+        #theta = np.random.rand() * np.pi
         loc = Point(R, theta, 0.0)
         new_detection = Detection(loc)
         self.detections.append(new_detection)
