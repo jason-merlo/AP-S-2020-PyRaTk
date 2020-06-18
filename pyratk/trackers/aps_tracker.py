@@ -21,14 +21,13 @@ class ApsTracker(object):
         """
         Initialize tracker class.
         """
-        self.valid_constraints = {1: ['x', 'y', 'z'],
-                                  2: ['xy', 'xz', 'yz'],
-                                  3: []}
-
         # copy arguments into attributes
         self.daq = daq
         self.receiver_array = receiver_array
         self.detections = []
+
+        self.pulse = self.receiver_array[0].transmitter.pulses[0]
+        self.chirp_rate = self.pulse.bw / self.pulse.delay
 
         # Configure control signals
         self.connect_control_signals()
@@ -57,11 +56,11 @@ class ApsTracker(object):
         #var0=signal.resample_poly(var00,4,1)
         #var1=signal.resample_poly(var01,4,1)
         f=np.linspace(-50000,50000,num=var0.size-1)
-        r_d0=np.abs(f[np.argmax(var0)]*3e8/100e9*2/3/2)
-        r_d1=np.abs(f[np.argmax(var1)]*3e8/100e9*2/3/2)
+        r_d0=np.abs(f[np.argmax(var0)]*3e8/self.chirp_rate/2)
+        r_d1=np.abs(f[np.argmax(var1)]*3e8/self.chirp_rate/2)
         theta=np.arcsin((r_d0-r_d1)/0.3864)+0.5*np.pi
         R=0.5*(r_d0+r_d1)
-        
+
         # loc is cylindrical (R, theta, Z), but Z is ignored by plot
         #R = np.random.rand() * 15
         #theta = np.random.rand() * np.pi

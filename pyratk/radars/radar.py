@@ -83,7 +83,7 @@ class Receiver(object):
         self.fast_center_bin = np.ceil(self.fast_fft_size / 2)
         self.fast_bin_size = self.daq.sample_rate / self.fast_fft_size
         self.slow_center_bin = np.ceil(self.slow_fft_size / 2)
-        self.slow_bin_size = self.daq.sample_rate * self.transmitter.pulses[0].delay / self.slow_fft_size
+        self.slow_bin_size = (1 / self.transmitter.pulses[0].delay) / self.slow_fft_size
 
         self.fast_fft_data = np.ones(self.fast_fft_size)
         self.fft_mat = np.ones((self.fast_fft_size, self.slow_fft_size))

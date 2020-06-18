@@ -201,6 +201,7 @@ class DataManager(MuxBuffer):
                     name, data=self.source.ts_buffer,
                     compression=COMPRESSION,
                     compression_opts=COMPRESSION_OPTS)
+                print('(DataManager) Saved dataset successfully.')
             except Exception as e:
                 print("(DataManager) Error saving dataset: ", e)
 
@@ -494,6 +495,7 @@ class DataManager(MuxBuffer):
         """Close the selected object in the DAQ manager."""
         for source in self.source_list:
             source.close()
+        self.db.close()
 
     # === PROPERTIES ====================================================
 

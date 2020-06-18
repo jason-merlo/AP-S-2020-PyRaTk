@@ -15,21 +15,26 @@ from matplotlib import cm       # Used for colormaps
 
 
 class RangeDopplerWidget(pg.PlotWidget):
-    def __init__(self, receiver, xrange=[-50,50], yrange=[-15e3,0]):
+    def __init__(self, receiver, xrange=[-50,50], yrange=[-15e3,0], showMeters=False):
         super().__init__()
 
         # Copy arguments to member variables
         self.daq = receiver.daq
         self.source = self.daq.source
         self.receiver = receiver
+        self.pulse = self.receiver.transmitter.pulses[0]
+        self.showMeters = showMeters
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
+
+        self.freq_to_vel = (3e8 / self.pulse.fc) / 2
+        self.freq_to_range = (self.pulse.delay / self.pulse.bw) * 3e8
 
         self.xrange = xrange
         self.yrange = yrange
 
         # TODO temp
-        self.downsample = 1
+        self.downsample = 1 # MUST EQUAL 1
 
         # FPS ticker data
         self.lastTime = time.time()
@@ -55,8 +60,12 @@ class RangeDopplerWidget(pg.PlotWidget):
 
         self.rescale()
 
-        self.setLabel('left', 'Frequency', units='Hz')
-        self.setLabel('bottom', 'Frequency', units='Hz')
+        if showMeters:
+            self.setLabel('left', 'Range', units='m')
+            self.setLabel('bottom', 'Velocity', units='m/s')
+        else:
+            self.setLabel('left', 'Frequency', units='Hz')
+            self.setLabel('bottom', 'Frequency', units='Hz')
         self.showGrid(x=True, y=True)
 
         left_axis=self.getAxis('left')
@@ -116,8 +125,12 @@ class RangeDopplerWidget(pg.PlotWidget):
         self.update_period = \
             self.source.sample_chunk_size / self.source.sample_rate
 
-        self.img.scale(self.receiver.slow_bin_size * self.downsample,
-                       self.receiver.fast_bin_size * self.downsample)
+        if self.showMeters:
+            self.img.scale(self.receiver.slow_bin_size * self.freq_to_vel,
+                           self.receiver.fast_bin_size * self.freq_to_range)
+        else:
+            self.img.scale(self.receiver.slow_bin_size,
+                           self.receiver.fast_bin_size)
 
         self.setRange(disableAutoRange=True, yRange=np.array(self.yrange))
 

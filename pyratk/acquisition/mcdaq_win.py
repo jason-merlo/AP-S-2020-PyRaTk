@@ -140,6 +140,8 @@ class mcdaq_win(DAQ):
         if (event_type == EventType.ON_DATA_AVAILABLE
                 or event_type == EventType.ON_END_OF_INPUT_SCAN):
 
+            # print('(mcdaq_win) updated')
+
             # current_time = datetime.now()
             # print('\n')
             # print('delta-time =', current_time - self._last_time)

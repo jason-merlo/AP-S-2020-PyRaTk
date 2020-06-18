@@ -12,6 +12,8 @@ from pyratk.datatypes.geometry import Point
 TransmitterTuple = namedtuple('Transmitter', ['location', 'pulses'])
 ReceiverTuple = namedtuple('Receiver', ['daq_index', 'location'])
 
+Pulse = namedtuple('Pulse', ['fc', 'bw', 'delay'])
+
 # Detection = namedtuple('Detection', ['location', 'power', 'velocity', 'doppler'])
 
 @dataclass
