@@ -29,6 +29,8 @@ class ApsTracker(object):
         self.pulse = self.receiver_array[0].transmitter.pulses[0]
         self.chirp_rate = self.pulse.bw / self.pulse.delay
 
+        self.baseline=1.18 # m
+
         # Configure control signals
         self.connect_control_signals()
 
@@ -58,7 +60,7 @@ class ApsTracker(object):
         f=np.linspace(-50000,50000,num=var0.size-1)
         r_d0=np.abs(f[np.argmax(var0)]*3e8/self.chirp_rate/2)
         r_d1=np.abs(f[np.argmax(var1)]*3e8/self.chirp_rate/2)
-        theta=np.arcsin((r_d0-r_d1)/0.3864)+0.5*np.pi
+        theta=np.arcsin((r_d0-r_d1)/self.baseline)+0.5*np.pi
         R=0.5*(r_d0+r_d1)
 
         # loc is cylindrical (R, theta, Z), but Z is ignored by plot

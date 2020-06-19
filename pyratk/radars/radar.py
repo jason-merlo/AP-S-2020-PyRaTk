@@ -73,6 +73,8 @@ class Receiver(object):
         self.slow_fft_window_type = slow_fft_window_type
         self.slow_fft_len = slow_fft_len
 
+        self.pulse = self.transmitter.pulses[0]
+
         self.datacube = DataCube(self)
 
         self.init_data()
@@ -87,6 +89,10 @@ class Receiver(object):
 
         self.fast_fft_data = np.ones(self.fast_fft_size)
         self.fft_mat = np.ones((self.fast_fft_size, self.slow_fft_size))
+
+        self.freq_to_range = -(self.pulse.delay / self.pulse.bw) * 3e8
+
+        self.freq_correction = 5.5 / self.freq_to_range
 
         self.fast_fmax = 0
         self.slow_fmax = 0

@@ -15,7 +15,7 @@ from matplotlib import cm       # Used for colormaps
 
 
 class RangeDopplerWidget(pg.PlotWidget):
-    def __init__(self, receiver, xrange=[-50,50], yrange=[-15e3,0], showMeters=False):
+    def __init__(self, receiver, xrange=[-50,50], yrange=[-10e3,0], showMeters=True):
         super().__init__()
 
         # Copy arguments to member variables
@@ -28,7 +28,9 @@ class RangeDopplerWidget(pg.PlotWidget):
             self.source.sample_chunk_size / self.source.sample_rate
 
         self.freq_to_vel = (3e8 / self.pulse.fc) / 2
-        self.freq_to_range = (self.pulse.delay / self.pulse.bw) * 3e8
+        self.freq_to_range = -(self.pulse.delay / self.pulse.bw) * 3e8 / 2
+
+        self.offset_freq = 5.5 / self.freq_to_range * 2
 
         self.xrange = xrange
         self.yrange = yrange
@@ -55,7 +57,7 @@ class RangeDopplerWidget(pg.PlotWidget):
 
         # set colormap
         self.img.setLookupTable(lut)
-        self.img.setLevels([-80, 10]) # Good for drone
+        self.img.setLevels([-90, -10]) # Good for drone
         #self.img.setLevels([-10, 20]) # Good for drone
 
         self.rescale()
@@ -66,13 +68,12 @@ class RangeDopplerWidget(pg.PlotWidget):
         else:
             self.setLabel('left', 'Frequency', units='Hz')
             self.setLabel('bottom', 'Frequency', units='Hz')
+            # Invert y-axis so negative is "up" (corresponds with range)
+            self.getViewBox().invertY(True)
         self.showGrid(x=True, y=True)
 
         left_axis=self.getAxis('left')
         left_axis.setGrid(255)
-
-        # Invert y-axis so negative is "up" (corresponds with range)
-        self.getViewBox().invertY(True)
 
         self.img.setCompositionMode(pg.QtGui.QPainter.CompositionMode_Plus)
 
@@ -126,20 +127,25 @@ class RangeDopplerWidget(pg.PlotWidget):
             self.source.sample_chunk_size / self.source.sample_rate
 
         if self.showMeters:
-            self.img.scale(self.receiver.slow_bin_size * self.freq_to_vel,
-                           self.receiver.fast_bin_size * self.freq_to_range)
+            slow_scale = self.receiver.slow_bin_size * self.freq_to_vel
+            fast_scale = self.receiver.fast_bin_size * self.freq_to_range
+            yrange = np.array(self.yrange) * self.freq_to_range
+            slow_limit = self.receiver.slow_bin_size * self.receiver.slow_fft_size / 4 * self.freq_to_vel
         else:
-            self.img.scale(self.receiver.slow_bin_size,
-                           self.receiver.fast_bin_size)
+            slow_scale = self.receiver.slow_bin_size
+            fast_scale = self.receiver.fast_bin_size
+            yrange = self.yrange
+            slow_limit = self.receiver.slow_bin_size * self.receiver.slow_fft_size / 4
 
-        self.setRange(disableAutoRange=True, yRange=np.array(self.yrange))
+
+        self.img.scale(slow_scale, fast_scale)
+
+        self.setRange(disableAutoRange=True, yRange=np.array(yrange))
+
+        offset_bins = self.offset_freq / self.receiver.fast_fft_size
 
         self.img.translate(-np.array(self.receiver.fft_mat.shape[1]) / (2 * self.downsample),
             -np.array(self.receiver.fft_mat.shape[0]) / (2 * self.downsample))
-
-
-        # TODO: why is the /4 instead of /2??
-        slow_limit = self.receiver.slow_bin_size * self.receiver.slow_fft_size / 4
 
         self.setLimits(
             xMin=-slow_limit, xMax=slow_limit)
