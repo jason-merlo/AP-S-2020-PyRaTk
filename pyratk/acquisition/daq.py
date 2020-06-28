@@ -53,6 +53,29 @@ class DAQ(QtCore.QThread):
         shape = (self.num_channels, self.sample_chunk_size)
         self.ts_buffer = TimeSeries(length, shape)
 
+    def sample_loop(self):
+        """Call get_samples forever."""
+        while self.running:
+            if self.paused:
+                # warning('(daq.py) daq paused...')
+                time.sleep(0.1)  # sleep 100 ms
+            else:
+                if self.daq_type == "FakeDAQ":
+                    self.get_fake_samples()
+                else:
+                    self.get_samples()
+
+                new_data = (self.data, self.sample_num)
+
+                # Set the update event to True once data is read in
+                self.data_available_signal.emit(new_data)
+                self.ts_buffer.append(self.data)
+
+                # Incriment sample number
+                self.sample_num += 1
+
+        print("Sampling thread stopped.")
+
     # === CONTROL =======================================================
     def close(self):
         self.running = False

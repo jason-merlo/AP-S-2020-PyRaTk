@@ -69,7 +69,7 @@ class SynthDAQ(daq.DAQ):
         self.reset_flag = False
 
         # Fake sampler period
-        self.sample_chunk_period = self.sample_chunk_size / self.sample_rate
+        self.sample_chunk_period = self.sample_period = self.sample_chunk_size / self.sample_rate
 
         # Create data member to store samples
         self.data = None

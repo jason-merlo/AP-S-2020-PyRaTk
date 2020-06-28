@@ -327,7 +327,7 @@ class DataManager(MuxBuffer):
 
         # Add timestamp data per sample (to match NI readout)
         start = 0
-        step = self.source.sample_period
+        step = self.source.sample_interval
         stop = num_chunks * step
         sample_times = np.array([np.linspace(start, stop, new_data.shape[0])]).transpose()
 
@@ -346,7 +346,7 @@ class DataManager(MuxBuffer):
         header_1 = ('Timestamp', date_str) * num_channels
         header.append(','.join(header_1))
 
-        header_2 = ('Interval', str(self.source.sample_period))\
+        header_2 = ('Interval', str(self.source.sample_interval))\
                     * num_channels
         header.append(','.join(header_2))
 
