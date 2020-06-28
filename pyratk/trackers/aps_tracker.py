@@ -70,7 +70,7 @@ class ApsTracker(object):
         self.max_range[1] += (np.abs(self.max_freq[1] * 3e8/self.chirp_rate/2) - 2.47) * self.weight
 
         theta = np.arcsin((self.max_range[0] - self.max_range[1]) / self.baseline) + np.pi * 0.5
-        R = np.average(self.max_range) * 0.5
+        R = np.average(self.max_range)
 
         # loc is cylindrical (R, theta, Z), but Z is ignored by plot
         #R = np.random.rand() * 15
