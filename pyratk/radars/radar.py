@@ -198,7 +198,8 @@ class Receiver(object):
 
         # print('dc.shape',dc.shape)
         self.fft_mat = self.compute_fft2(self.datacube[-1], (self.slow_fft_size, self.fast_fft_size))
-        self.fft_mat=np.multiply(self.fft_mat,self.mti_window)
+        # self.fft_mat=np.multiply(self.fft_mat,self.mti_window)
+        self.fft_mat[int(self.slow_center_bin), :] = np.zeros(self.fft_mat.shape[1]).T
         # print('fft_mat.shape', self.fft_mat.shape)
 
         # if self.datacube[-1].shape == self.datacube[-2].shape:

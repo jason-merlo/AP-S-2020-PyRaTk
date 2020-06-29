@@ -29,7 +29,8 @@ class ApsTracker(object):
         self.pulse = self.receiver_array[0].transmitter.pulses[0]
         self.chirp_rate = self.pulse.bw / self.pulse.delay
 
-        self.baseline=1.18 # m
+        # self.baseline=1.18 # m
+        self.baseline=1.321
 
         # Configure control signals
         self.connect_control_signals()
@@ -57,7 +58,7 @@ class ApsTracker(object):
         var1=np.power(np.mean(self.receiver_array[1].fft_mat,axis=0),2)
         #var0=signal.resample_poly(var00,4,1)
         #var1=signal.resample_poly(var01,4,1)
-        f=np.linspace(-50000,50000,num=var0.size-1)
+        f=np.linspace(-50000,50000,num=var0.size)
         r_d0=np.abs(f[np.argmax(var0)]*3e8/self.chirp_rate/2)
         r_d1=np.abs(f[np.argmax(var1)]*3e8/self.chirp_rate/2)
         theta=np.arcsin((r_d0-r_d1)/self.baseline)+0.5*np.pi
