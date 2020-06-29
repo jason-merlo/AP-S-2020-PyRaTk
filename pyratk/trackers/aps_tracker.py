@@ -36,7 +36,8 @@ class ApsTracker(object):
         self.pulse = self.receiver_array[0].transmitter.pulses[0]
         self.chirp_rate = self.pulse.bw / self.pulse.delay
 
-        self.baseline=1.3 # m
+        # self.baseline=1.18 # m
+        self.baseline=1.321
 
         # Configure control signals
         self.connect_control_signals()

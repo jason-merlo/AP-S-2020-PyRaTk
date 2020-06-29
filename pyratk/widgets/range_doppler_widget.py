@@ -15,7 +15,7 @@ from matplotlib import cm       # Used for colormaps
 
 
 class RangeDopplerWidget(pg.PlotWidget):
-    def __init__(self, receiver, xrange=[-50,50], yrange=[-10e3,0], showMeters=True):
+    def __init__(self, receiver, xrange=[-50,50], yrange=[-50e3,0], showMeters=True):
         super().__init__()
 
         # Copy arguments to member variables
