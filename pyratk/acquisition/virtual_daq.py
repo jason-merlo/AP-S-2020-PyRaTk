@@ -100,7 +100,7 @@ class VirtualDAQ(daq.DAQ):
             raise Exception('No dataset loaded.')
 
 
-    def get_samples(self, stride=1, loop=-1, playback_speed=0.25):
+    def get_samples(self, stride=1, loop=-1, playback_speed=0.5):
         """Read sample from dataset at sampled speed, or one-by-one."""
         if self.ds:
             # Read in samples from dataset

@@ -12,11 +12,12 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 import numpy as np              # Used for numerical operations
 import platform                 # Get OS for DPI scaling
+import math
 from pyratk.datatypes.geometry import Point, Circle
 
 
 class PolarTrackerWidget(pg.GraphicsLayoutWidget):
-    def __init__(self, tracker, max_range=20):
+    def __init__(self, tracker, max_range=20, moving_average_weight=0.2, trail_length=100):
         super().__init__()
         """
         Initialize polar tracker widget.
@@ -28,11 +29,24 @@ class PolarTrackerWidget(pg.GraphicsLayoutWidget):
                         - power (float): power of detection
                         - doppler (float): Doppler velocity of detection
                         - velocity (Point): Velocity vector (if tracked)
+        max_range - float
+            Maximum range shown on the plot
+
+        moving_average_weight - float
+            Value between 0 and 1 specifying how much weight new values have
+            avg = old * (1 - weight) + new * weight
         """
 
         # Copy arguments to member variables
         self.tracker = tracker
         self.max_range = max_range
+        self.weight = moving_average_weight
+
+        self.det_loc = Point()
+
+        self.trail_length = trail_length
+
+        self.trajectory = []
 
         # Add plots to layout
         self.plot = self.addPlot()
@@ -60,7 +74,10 @@ class PolarTrackerWidget(pg.GraphicsLayoutWidget):
         self.det_loc_plot = pg.ScatterPlotItem(
             size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 0, 255))
 
+
         self.plot.addItem(self.det_loc_plot)
+
+        self.pw_trajectory = self.plot.plot()
 
         # Set up plot
         #self.plot.setLimits(yMin=0)
@@ -80,17 +97,33 @@ class PolarTrackerWidget(pg.GraphicsLayoutWidget):
         Draw detections on graph.
         '''
         self.det_loc_plot.clear()
-        for det in self.tracker.detections:
+        if self.tracker.detections:
+            det = self.tracker.detections[0]
+
             R = det.location.p[0]
             theta = det.location.p[1]
 
             x = R * np.cos(theta)
             y = R * np.sin(theta)
 
-            self.det_loc_plot.addPoints(pos=[Point(x, y)])
+            if not math.isnan(theta):
+
+                self.det_loc *= 1.0 - self.weight
+                self.det_loc += Point(x, y) * self.weight
+
+                print('PolarTrackerWidget(): det_loc', self.det_loc)
+
+                self.trajectory.append(self.det_loc)
+
+            data = np.array([(p[0], p[1]) for p in self.trajectory[self.trail_length]])
+            trajectory_pen = pg.mkPen({'color': "FF0A", 'width': 2})
+            self.pw_trajectory.setData(data, pen=trajectory_pen)
+
+            self.det_loc_plot.addPoints(pos=[self.det_loc])
 
     def reset(self):
         # self.tracker.reset()
+        self.trajectory = []
         self.update()
 
     # === UTILITY FUNCTIONS ===================================================

@@ -57,8 +57,8 @@ class RangeDopplerWidget(pg.PlotWidget):
 
         # set colormap
         self.img.setLookupTable(lut)
-        self.img.setLevels([-90, -10]) # Good for drone
-        #self.img.setLevels([-10, 20]) # Good for drone
+        self.img.setLevels([-70, -10]) # Good for drone
+        # self.img.setLevels([-60, 10]) # Good for pedestrian
 
         self.rescale()
 
