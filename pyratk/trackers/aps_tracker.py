@@ -17,7 +17,7 @@ class ApsTracker(object):
     """Class to track detections using 4 doppler measurements."""
 
     # === INITIALIZATION METHODS ============================================= #
-    def __init__(self, daq, receiver_array, moving_average_weight=1.0):
+    def __init__(self, daq, receiver_array, moving_average_weight=1.0, cable_len=3.05):
         """
         Initialize tracker class.
         """
@@ -25,6 +25,8 @@ class ApsTracker(object):
         self.daq = daq
         self.receiver_array = receiver_array
         self.detections = []
+
+        self.cable_len = cable_len
 
         self.max_freq = np.zeros(len(receiver_array))
         self.max_range = np.zeros(len(receiver_array))
@@ -66,8 +68,8 @@ class ApsTracker(object):
         self.max_freq[0] = (np.argmax(var0, axis=0) - self.receiver_array[0].fast_center_bin) * self.receiver_array[0].fast_bin_size
         self.max_freq[1] = (np.argmax(var1, axis=0) - self.receiver_array[1].fast_center_bin) * self.receiver_array[1].fast_bin_size
 
-        self.max_range[0] += (np.abs(self.max_freq[0] * 3e8/self.chirp_rate/2) - 2.47) * self.weight
-        self.max_range[1] += (np.abs(self.max_freq[1] * 3e8/self.chirp_rate/2) - 2.47) * self.weight
+        self.max_range[0] += (np.abs(self.max_freq[0] * 3e8/self.chirp_rate/2) - self.cable_len) * self.weight
+        self.max_range[1] += (np.abs(self.max_freq[1] * 3e8/self.chirp_rate/2) - self.cable_len) * self.weight
 
         theta = np.arcsin((self.max_range[0] - self.max_range[1]) / self.baseline) + np.pi * 0.5
         R = np.average(self.max_range)
