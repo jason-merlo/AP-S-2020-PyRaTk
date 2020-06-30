@@ -100,7 +100,7 @@ class VirtualDAQ(daq.DAQ):
             raise Exception('No dataset loaded.')
 
 
-    def get_samples(self, stride=1, loop=-1, playback_speed=0.5):
+    def get_samples(self, stride=1, loop=-1, playback_speed=0.05):
         """Read sample from dataset at sampled speed, or one-by-one."""
         if self.ds:
             # Read in samples from dataset
@@ -114,6 +114,7 @@ class VirtualDAQ(daq.DAQ):
 
             # Delay by sample period
             if loop == -1 or loop == 1:
+                sample_chunk_period = self.sample_chunk_size / self.sample_rate
                 time.sleep(self.sample_period / playback_speed)
             elif loop == 0:
                 print('Stepped:', stride)
